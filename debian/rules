@@ -51,6 +51,7 @@ install:
 	$(MAKE) install PREFIX=$(TMP)/usr
 	mv $(TMP)/usr/bin/nspamper $(TMP)/usr/sbin/
 	rmdir $(TMP)/usr/bin
+	cp nspamper.conf $(TMP)/etc
 	cp debian/ip-up $(TMP)/etc/ppp/ip-up.d/nspamper
 	chmod +x $(TMP)/etc/ppp/ip-up.d/nspamper
 
