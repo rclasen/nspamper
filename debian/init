@@ -18,7 +18,7 @@ test -f $DAEMON || exit 0
 set -e
 
 
-piddir=/var/run/$NAME
+piddir=/var/run
 pidfile=$piddir/$NAME.pid
 
 
