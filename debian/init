@@ -1,0 +1,51 @@
+#! /bin/sh
+#
+#		Written by Miquel van Smoorenburg <miquels@cistron.nl>.
+#		Modified for Debian GNU/Linux
+#		by Ian Murdock <imurdock@gnu.ai.mit.edu>.
+#
+# Version:	@(#)skeleton  1.8  03-Mar-1998  miquels@cistron.nl
+#
+# This file was automatically customized by dh-make on Thu,  1 Aug 2002 18:35:50 +0200
+
+PATH=/sbin:/bin:/usr/sbin:/usr/bin
+NAME=nspamper
+DAEMON=/usr/sbin/$NAME
+DESC="NS Pamper daemon"
+
+test -f $DAEMON || exit 0
+
+set -e
+
+
+piddir=/var/run/$NAME
+pidfile=$piddir/$NAME.pid
+
+
+case "$1" in
+  start)
+	echo -n "Starting $DESC: "
+	mkdir -p $piddir
+	start-stop-daemon --start --quiet --pidfile $pidfile \
+		--exec $DAEMON -- 
+	echo "$NAME."
+	;;
+  stop)
+	echo -n "Stopping $DESC: "
+	start-stop-daemon --oknodo --stop --quiet --pidfile $pidfile 
+	echo "$NAME."
+	;;
+  restart|force-reload)
+	echo "Restarting $DESC: ..."
+	$0 stop
+	sleep 1
+	$0 start
+	;;
+  *)
+	N=/etc/init.d/$NAME
+	echo "Usage: $N {start|stop|restart|force-reload}" >&2
+	exit 1
+	;;
+esac
+
+exit 0

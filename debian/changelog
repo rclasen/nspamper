@@ -1,0 +1,9 @@
+nspamper (0.0.1) unstable; urgency=low
+
+  * Initial Release.
+
+ -- Rainer Clasen <bj@zuto.de>  Sun, 14 Sep 2003 12:27:41 +0200
+
+Local variables:
+mode: debian-changelog
+End:

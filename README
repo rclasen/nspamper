@@ -1,0 +1,27 @@
+nspamper version 0.0.1
+======================
+
+nspamper is a tiny daemon that takes care of updating a dynamic DNS name
+using Bind9 NSupdates. You still have to tell it the IP, but no longer
+have to take care of retransmits, ...
+
+To install this module type the following:
+
+   perl Makefile.PL
+   make
+   make test
+   make install
+
+DEPENDENCIES
+
+This module requires these other modules and libraries:
+
+  Net::DNS
+  Sys::Syslog;
+
+COPYRIGHT AND LICENCE
+
+GPL
+
+Copyright (C) 2003 Rainer Clasen
+

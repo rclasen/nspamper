@@ -1,0 +1,5 @@
+#!/bin/sh
+
+#if [ "$LINKNAME"x = tdslx ]; then
+#	( echo $PPP_LOCAL > /var/run/nspamper.sock ) &
+#fi

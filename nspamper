@@ -1,0 +1,307 @@
+#!/usr/bin/perl -w
+
+=head1 NAME
+
+nspamper - daemon to update dynamic DNS names
+
+=head1 SYNOPSIS
+
+ nspamper
+
+=head1 DESCRIPTION
+
+This is a bind9 nsupdate client to keep a dynamic A record up to date
+
+Changes must be triggered by writing the new IP to a socket/FIFO.
+
+This daemon will retry to send the update until the Nameserver returns the
+proper IP.
+
+Once the update was successfull, this script assumes, the server won't
+forget the IP and therefor sleeps until the IP is changed again.
+
+This has to run as daemon, to avoid problems with overlapping requests. That means it gracefully accepts a new IP although the current one wasn't accepted by the nameserver.
+
+=cut
+
+# TODO: explain config
+
+use strict;
+use Net::DNS;
+use Sys::Syslog;
+use POSIX;
+
+# TODO: getopt
+
+my $prog = "nspamper";
+my $ipfile = "/var/lib/misc/$prog.ip";
+my $sock = "/var/run/$prog.sock";
+my $pidfile = "/var/run/$prog.pid";
+my $conf = "/etc/$prog.conf";
+
+my $VERSION = "0.0.1";
+
+# read config
+use vars qw( $name $key );
+do $conf;
+#$name = "warp.dyn.zuto.de";
+#$key = 'blah==';
+
+unless( $name =~ /\.(.*)/ ){
+	print STDERR "invalid name: $name\n";
+	exit 1;
+}
+my $dom = $1;
+
+
+
+# daemonize
+use vars qw( $cleanup );
+
+my $pid = fork;
+if( $pid < 0 ){
+	print STDERR "fork() failed: $!\n";
+	exit 1;
+
+} elsif( $pid > 0 ){
+	exit 0;
+}
+
+# TODO: close STDERR, detach tty
+
+openlog( $prog, "pid", "daemon" );
+syslog( "info", "starting" );
+&pidfile( $pidfile ) or exit 1;
+
+$cleanup++;
+END {
+	if( $cleanup ){
+		syslog( "info", "exiting" );
+		unlink $sock;
+		unlink $pidfile;
+	}
+}
+
+# TODO: catch SIGINT and SIGTERM
+
+my $wip = &read_ip;
+syslog( "debug", "old IP: $wip") if defined $wip;
+
+unlink $sock;
+if( ! POSIX::mkfifo( $sock, 0700 ) ){
+	syslog( "err", "failed to create fifo: $!" );
+	exit 1;
+}
+
+while(1){
+	if( ! $wip ){
+		syslog( "info", "IP is not yet known" );
+		goto WAIT;
+	}
+		
+	my $ns = &get_nameserver( $dom ) or goto RETRY;
+
+	my $cip = &get_ip( $ns, $name );
+	if( ! $cip or $cip ne $wip ){
+		&set_ip( $ns, $dom, $key, $name, $wip ) or goto RETRY;
+		sleep 5;
+		next;
+	}
+
+WAIT:
+	my $nip = &wait_newip or goto RETRY;
+	$wip = $nip;
+	syslog( "info", "new IP: $wip");
+	&write_ip( $wip );
+	next;
+
+RETRY:
+	sleep 10;
+}
+
+# find nameserver responsible for a domain
+sub get_nameserver {
+	my( $domain ) = @_;
+
+	my $res = new Net::DNS::Resolver;
+	my $query = $res->query( $domain, "SOA" );
+	if( ! $query ){
+		syslog( "notice", "failed to get NS for $dom: ".
+			$res->errorstring );
+		return;
+	}
+
+	my $rr = ($query->answer)[0];
+	if( $rr->type ne "SOA" ){
+		syslog( "notice", "failed to get NS for $dom: ".
+			"got non-SOA record");
+		return;
+	}
+
+	my $master = $rr->mname;
+
+	$query = $res->query( $master, "A" );
+	if( ! $query ){
+		syslog( "notice", "failed to get NS IP for $master: ".
+			$res->errorstring );
+		return;
+	}
+	
+	$rr = ($query->answer)[0];
+	if( $rr->type ne "A" ){
+		syslog( "notice", "failed to get NS IP for $master: ".
+			"got no A record");
+		return;
+	}
+
+	return $rr->address;
+}
+
+
+
+# get current IP for a name from responsible server
+sub get_ip {
+	my( $ns, $name ) = @_;
+
+	my $res = new Net::DNS::Resolver;
+	$res->nameservers($ns);
+	my $query = $res->query( $name, "A" );
+	if( ! $query ){
+		syslog( "notice", "failed to get current IP: ".
+			$res->errorstring );
+		return;
+	}
+
+	my $rr = ($query->answer)[0];
+	if( $rr->type ne "A" ){
+		syslog( "notice", "failed to get current IP: ".
+			"got no A record" );
+		return;
+	}
+
+	return $rr->address;
+}
+
+# update IP on server
+sub set_ip {
+	my( $ns, $dom, $key, $name, $ip ) = @_;
+
+	syslog( "debug", "updating $name=$ip");
+
+	my $upd = Net::DNS::Update->new( $dom );
+	$upd->push( "update", rr_del("$name A"));
+	$upd->push( "update", rr_add("$name A $ip"));
+	$upd->sign_tsig( $name, $key );
+
+	my $res = Net::DNS::Resolver->new;
+	$res->nameservers( $ns );
+	my $rep = $res->send( $upd );
+	if( defined $rep ){
+		if( $rep->header->rcode ne "NOERROR" ){
+			syslog( "notice", "failed to update $name: ".
+				$rep->header->rcode );
+			return;
+		}
+	} else {
+		syslog( "notice", "failed to update $name: ".
+			$res->errorstring );
+		return;
+	}
+
+	return 1;
+}
+
+# remember IP for restart
+sub write_ip {
+	my( $ip ) = @_;
+
+	syslog( "info", "waiting for new IP");
+	local *F;
+	if( ! open( F, ">$ipfile") ){
+		syslog( "err", "failed to write IP: $!" );
+		return;
+	}
+	print F "$ip\n";
+	close F;
+}
+
+# read stored IP on startup 
+sub read_ip {
+	local *F;
+	open( F, $ipfile ) or return;
+	my $ip = <F>;
+	close F;
+
+	chomp $ip;
+	return $ip if $ip =~ /^\d+\.\d+\.\d+\.\d+$/;
+	return undef;
+}
+
+# wait until we get a new IP
+sub wait_newip {
+	syslog( "debug", "waiting for new IP" );
+
+	local *SOCK;
+	if( ! open( SOCK, "$sock" ) ){
+		syslog( "err", "cannot open fifo: $!");
+		exit 1;
+	}
+	my $ip = <SOCK>;
+	close SOCK;
+
+	chomp $ip;
+	return $ip if $ip =~ /^\d+\.\d+\.\d+\.\d+$/;
+
+	syslog( "notice", "ignoring invalid IP" );
+	return undef;
+}
+
+
+sub pidfile {
+	my $file = shift;
+
+	my $pid = $$;
+	local *FH;
+	if( open( FH, $file )){
+		# lockfile exists!
+
+		my $oldpid = <FH>;
+		close(FH);
+		chomp $oldpid;
+
+		if( ($oldpid =~ /^\d+$/) && ! kill 0, $oldpid ){
+			syslog( "info", "overriding stale lockfile");
+			unlink( $file );
+
+		} else {
+			syslog( "err", "already runing with PID $oldpid");
+			return;
+		}
+	}
+
+	if( ! sysopen(FH, $file, O_WRONLY | O_EXCL | O_CREAT, 0600) ){
+		syslog( "err", "cannot create pidfile $file: $!" );
+		return;
+	}
+
+	print FH $pid, "\n";
+	close FH;
+
+	return 1;
+}
+
+=head1 BUGS
+
+Until an IP is registered, the fifo isn't checked again.  This leads to
+hanging processes trying to tell me a new IP
+
+=head1 AUTHOR
+
+Rainer Clasen, E<lt>rc@zuto.deE<gt>
+
+=head1 SEE ALSO
+
+L<nsupdate>.
+
+=cut
+
