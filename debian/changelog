@@ -1,3 +1,9 @@
+nspamper (0.0.2) unstable; urgency=low
+
+  * use lower TTL
+
+ -- Rainer Clasen <bj@zuto.de>  Fri,  3 Oct 2003 16:34:06 +0200
+
 nspamper (0.0.1) unstable; urgency=low
 
   * Initial Release.
