@@ -12,7 +12,8 @@ nspamper - daemon to update dynamic DNS names
 
 This is a bind9 nsupdate client to keep a dynamic A record up to date
 
-Changes must be triggered by writing the new IP to a socket/FIFO.
+Changes must be triggered using L<nspamper-change> which writes the new IP
+to a UNIX Socket.
 
 This daemon will retry to send the update until the Nameserver returns the
 proper IP.
@@ -29,6 +30,7 @@ This has to run as daemon, to avoid problems with overlapping requests. That mea
 use strict;
 use Net::DNS;
 use Sys::Syslog;
+use Socket;
 use POSIX;
 
 # TODO: getopt
@@ -39,7 +41,7 @@ my $sock = "/var/run/$prog.sock";
 my $pidfile = "/var/run/$prog.pid";
 my $conf = "/etc/$prog.conf";
 
-my $VERSION = "0.0.1";
+my $VERSION = "0.0.2";
 
 # read config
 -r $conf or die "missing config: $conf";
@@ -68,6 +70,7 @@ if( $pid < 0 ){
 	exit 0;
 }
 
+
 # TODO: close STDERR, detach tty
 
 openlog( $prog, "pid", "daemon" );
@@ -78,6 +81,7 @@ $cleanup++;
 END {
 	if( $cleanup ){
 		syslog( "info", "exiting" );
+		close SOCK;
 		unlink $sock;
 		unlink $pidfile;
 	}
@@ -85,39 +89,51 @@ END {
 
 # TODO: catch SIGINT and SIGTERM
 
-my $wip = &read_ip;
-syslog( "debug", "old IP: $wip") if defined $wip;
-
 unlink $sock;
-if( ! POSIX::mkfifo( $sock, 0700 ) ){
-	syslog( "err", "failed to create fifo: $!" );
+if( ! socket( SOCK, PF_UNIX, SOCK_STREAM, 0 )){
+	syslog( "err", "failed to open socket: $!" );
+	exit 1;
+}
+if( ! bind( SOCK, sockaddr_un($sock)) ){
+	syslog( "err", "failed to bind socket: $!" );
+	exit 1;
+}
+chmod( 0770, $sock );
+if( ! listen( SOCK, SOMAXCONN) ){
+	syslog( "err", "failedt to listen: $!");
 	exit 1;
 }
 
+my $wip = &read_ip;
+syslog( "debug", "old IP: $wip") if defined $wip;
+
+my $timeout = undef;
 while(1){
+
 	if( ! $wip ){
 		syslog( "info", "IP is not yet known" );
-		goto WAIT;
+		goto GETIP;
 	}
 		
-	my $ns = &get_nameserver( $dom ) or goto RETRY;
+	my $ns = &get_nameserver( $dom ) or next;
 
-	my $cip = &get_ip( $ns, $name );
+	my $cip = &get_ip( $ns, $name ) || "";
 	if( ! $cip or $cip ne $wip ){
-		&set_ip( $ns, $dom, $key, $name, $wip ) or goto RETRY;
-		sleep 5;
-		next;
+		syslog( "debug", "current IP: $cip");
+		if( &set_ip( $ns, $dom, $key, $name, $wip ) ){
+			$timeout = undef;
+		} else {
+			$timeout = 10;
+		}
 	}
 
-WAIT:
-	my $nip = &wait_newip or goto RETRY;
-	$wip = $nip;
-	syslog( "info", "new IP: $wip");
-	&write_ip( $wip );
-	next;
-
-RETRY:
-	sleep 10;
+GETIP:
+	my $nip = &wait_newip( $timeout );
+	if( $nip ){
+		$wip = $nip;
+		syslog( "info", "new IP: $wip");
+		&write_ip( $wip );
+	}
 }
 
 # find nameserver responsible for a domain
@@ -216,7 +232,7 @@ sub set_ip {
 sub write_ip {
 	my( $ip ) = @_;
 
-	syslog( "info", "waiting for new IP");
+	syslog( "info", "remembering new IP");
 	local *F;
 	if( ! open( F, ">$ipfile") ){
 		syslog( "err", "failed to write IP: $!" );
@@ -240,15 +256,23 @@ sub read_ip {
 
 # wait until we get a new IP
 sub wait_newip {
-	syslog( "debug", "waiting for new IP" );
+	my( $timeout ) = @_;
 
-	local *SOCK;
-	if( ! open( SOCK, "$sock" ) ){
-		syslog( "err", "cannot open fifo: $!");
-		exit 1;
+	syslog( "debug", "waiting for IP change" ) unless $timeout;
+
+	my $rin = '';
+	vec( $rin, fileno(SOCK), 1 ) = 1;
+	if( 0 >= select( $rin, undef, undef, $timeout ) ){
+		return;
 	}
-	my $ip = <SOCK>;
-	close SOCK;
+
+	if( ! accept( CLIENT, SOCK) ){
+		syslog( "err", "accept failed: $!" );
+		return;
+	}
+
+	my $ip = <CLIENT>;
+	close CLIENT;
 
 	chomp $ip;
 	return $ip if $ip =~ /^\d+\.\d+\.\d+\.\d+$/;
@@ -293,8 +317,7 @@ sub pidfile {
 
 =head1 BUGS
 
-Until an IP is registered, the fifo isn't checked again.  This leads to
-hanging processes trying to tell me a new IP
+I bet there are some.
 
 =head1 AUTHOR
 
@@ -302,7 +325,7 @@ Rainer Clasen, E<lt>rc@zuto.deE<gt>
 
 =head1 SEE ALSO
 
-L<nsupdate>.
+L<nspamper-change>, L<nsupdate>.
 
 =cut
 

@@ -1,0 +1,41 @@
+#!/usr/bin/perl -w
+
+=head1 NAME
+
+nspamper-change - client to infor nspamper of new IP
+
+=head1 SYNOPSIS
+
+ nspamper-change <IP>
+
+=head1 DESCRIPTION
+
+This is a tiny client telling the nspamper daemon the IP it has to keep up to date.
+
+=cut
+
+use strict;
+use Socket;
+
+my $sock = "/var/run/nspamper.sock";
+my $ip = shift or die "missing IP";
+
+socket( SOCK, PF_UNIX, SOCK_STREAM, 0 ) || die "socket: $!";
+connect( SOCK, sockaddr_un( $sock )) || die "connect $!";
+print SOCK $ip, "\n";
+close SOCK;
+
+=head1 BUGS
+
+I bet there are some.
+
+=head1 AUTHOR
+
+Rainer Clasen, E<lt>rc@zuto.deE<gt>
+
+=head1 SEE ALSO
+
+L<nspamper>.
+
+=cut
+

@@ -1,3 +1,9 @@
+nspamper (0.0.3) unstable; urgency=low
+
+  * use UNIX socket instead of fifo, need nspamper-change instead of echo
+
+ -- Rainer Clasen <bj@zuto.de>  Sat,  4 Oct 2003 18:47:15 +0200
+
 nspamper (0.0.2) unstable; urgency=low
 
   * use lower TTL
