@@ -42,6 +42,7 @@ my $conf = "/etc/$prog.conf";
 my $VERSION = "0.0.1";
 
 # read config
+-r $conf or die "missing config: $conf";
 use vars qw( $name $key );
 do $conf;
 #$name = "warp.dyn.zuto.de";
