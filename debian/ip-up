@@ -1,5 +1,6 @@
 #!/bin/sh
 
 #if [ "$LINKNAME"x = tdslx ]; then
-#	( echo $PPP_LOCAL > /var/run/nspamper.sock ) &
+#	nspamper-change $IPLOCAL
+#	nspamper-change $PPP_LOCAL
 #fi
