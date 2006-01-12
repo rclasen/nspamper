@@ -3,4 +3,6 @@ Makefile.PL
 MANIFEST
 nspamper
 nspamper.conf
+nspamper-change
 README
+META.yml                                 Module meta-data (added by MakeMaker)
