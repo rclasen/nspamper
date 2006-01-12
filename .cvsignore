@@ -2,3 +2,5 @@ Makefile
 blib
 pm_to_blib
 build-stamp
+*.tar.gz
+META.yml
