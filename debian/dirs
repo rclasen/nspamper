@@ -3,3 +3,4 @@ etc/ppp/ip-up.d
 var/lib/misc
 var/run
 usr/sbin
+usr/lib/cgi-bin

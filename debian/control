@@ -1,5 +1,5 @@
 Source: nspamper
-Section: interpreters
+Section: net
 Priority: optional
 Build-Depends: debhelper (>= 3.0.5), perl (>= 5.6.0-17)
 Maintainer: Rainer Clasen <bj@zuto.de>
@@ -8,15 +8,20 @@ Standards-Version: 3.5.1
 Package: nspamper
 Architecture: all
 Depends: libnet-dns-perl, ${perl:Depends}
-Description:  daemon to update dynamic DNS names
- This is a bind9 nsupdate client to keep a dynamic A record up to date
+Description: daemon to update dynamic DNS names
+ Nspamper is a bind9 nsupdate client to keep a dynamic A record up to date
  .
  Changes must be triggered by writing the new IP to a socket/FIFO.
  .
- This daemon will retry to send the update until the Nameserver returns the
+ The daemon will retry to send the update until the Nameserver returns the
  proper IP.
  .
  Once the update was successfull, this script assumes, the server won't
  forget the IP and therefor sleeps until the IP is changed again.
  .
- This has to run as daemon, to avoid problems with overlapping requests. That means it gracefully accepts a new IP although the current one wasn't accepted by the nameserver.
+ This has to run as daemon, to avoid problems with overlapping requests. 
+ That means it gracefully accepts a new IP although the current one wasn't 
+ accepted by the nameserver.
+ .
+ Within this package is a tool to manage the Nameserver keys and a CGI
+ script to support DynDNS clients.

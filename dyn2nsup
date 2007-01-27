@@ -1,0 +1,109 @@
+#!/usr/bin/perl -w
+
+use strict;
+use CGI qw/:standard/;
+use Nspamper;
+use Sys::Syslog; # TODO
+
+# spec: http://www.dyndns.com/developers/specs/syntax.html
+# TODO: return codes http://www.dyndns.com/developers/specs/return.html
+
+my( $prog ) = $0 =~ m:([^/]+)$:;
+openlog( $prog, "pid", "daemon" );
+
+print header;
+
+my $conf = "/etc/bind/ddns.conf";
+my $hosts = do $conf;
+if( ! $hosts ){
+	syslog("err", "cannot read config" );
+	exit 1;
+}
+
+if( ! $ENV{REMOTE_USER} ){
+	&fail( "badauth" );
+}
+
+my $sys = param("system") || "dyndns";
+if( $sys !~ /^(dyndns|statdns|custom)$/i ){
+	&fail( "badsys" );
+}
+
+my $myip = param("myip") || $ENV{REMOTE_ADDR};
+if( ! &isip($myip) ){
+	&fail( "nohost" );
+}
+
+my $wildcard = param("wildcard") || "OFF";
+#if( $wildcard !~ /^(on|off|nochg)$/i ){
+if( $wildcard !~ /^(off|nochg)$/i ){
+	&fail( "badsys" );
+}
+
+my $mx = param("mx") || "";
+#if( $mx !~ /^(|nochg|mx-hostname)$/i ){
+if( $mx !~ /^(|nochg)$/i ){
+	&fail( "badsys" );
+}
+
+my $backmx = param("backmx") || "NO";
+#if( $backmx !~ /^(no|nochg|yes)$/i ){
+if( $backmx !~ /^(no|nochg)$/i ){
+	&fail(  "badsys" );
+}
+
+my $offline = param("offline") || "NO";
+#if( $offline !~ /^(yes|no)$/i ){
+if( $offline !~ /^(no)$/i ){
+	&fail( "badsys" );
+}
+
+my @hostnames = split /,/, lc param("hostname");
+if( $#hostnames < 0 ){
+	&fail( "numhost" );
+}
+foreach my $hostname ( @hostnames ){
+	if( ! exists $hosts->{$hostname} ){
+		&fail( "nohost" );
+	}
+	my $dat = $hosts->{$hostname};
+	if( $dat->{user} ne $ENV{REMOTE_USER} ){
+		&fail( "!yours" );
+	}
+	&doupdate( $hostname, $myip, $dat->{key} );
+}
+print "good\n";
+exit 0;
+
+sub isip {
+	my( $arg ) = @_;
+	return unless defined $arg;
+	my( @i ) = ($arg =~ /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/) or return;
+	foreach my $o ( @i ){
+		return if $o < 0 or $o > 255;
+	}
+	return 1;
+}
+
+sub doupdate {
+	my( $fqdn, $ip, $key ) = @_;
+
+	my( $dom, $ns  ) = &Nspamper::get_domdat( $fqdn );
+	if( ! $ns or ! $dom ){
+		syslog("err", "failed to get Domain data");
+		&fail( "dnserr" );
+	}
+
+	my $old = &Nspamper::get_ip( $ns, $fqdn );
+	if( ! $old || $old ne $ip ){
+		&Nspamper::set_ip( $ns, $dom, $key, $fqdn, $ip )
+			or &fail( "dnserr" );
+	} else {
+		&fail( "nochg" );
+	}
+}
+
+sub fail {
+	print "@_\n";
+	exit 0;
+}

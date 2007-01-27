@@ -1,0 +1,128 @@
+#!/usr/bin/perl -w
+
+use strict;
+use Getopt::Long;
+use Data::Dumper;
+
+my $kdir = "/etc/bind/keys";
+my $conf = "/etc/bind/ddns.conf";
+my $ndc = "/etc/bind/ddns-keys.conf";
+my $domain = "dyn.zuto.de";
+
+# TODO manpage
+
+my $needhelp;
+my $wanthelp;
+
+if( ! GetOptions(
+	"help|h!"	=> \$wanthelp,
+	# TODO: conf
+	# TODO: output file locations
+)){
+	$needhelp++;
+}
+
+my $cmd = shift;
+if( ! defined $cmd or $cmd !~ /^(host|gen)$/ ){
+	print STDERR "invalid command\n";
+	$needhelp++;
+}
+
+if( $wanthelp ){
+	print <<EOF;
+$0 [opt] <cmd> [args]
+Options: TODO
+ --help                      this help
+Commands:
+ host <hostname>             add new dyndns hostnam
+ gen                         regenerate named config
+EOF
+	exit 0;
+}
+
+if( $needhelp ){
+	print STDERR "use --help for usage info\n";
+	exit 1;
+}
+
+
+my $dat = do $conf 
+	or die "cannot read config";
+
+#$dat = {
+#	"host"	=> {
+#		key => "blah",
+#		user => "bj",
+#		pass => "cpw",
+#	},
+#};
+
+if( $cmd eq "host" ){
+	my( $host ) = lc shift;
+
+	if( $host !~ /^[a-z][a-z0-9-]*\.$domain$/ ){
+		die "invalid hostname";
+	}
+
+	chdir $kdir || die "cannot change to key directory: $!";
+
+	if( ! &keyfile( $host ) ){
+		print "generating new key\n";
+		system( "/usr/sbin/dnssec-keygen  -a HMAC-MD5 -b 512 -n USER $host") == 0 
+			or die "keygen failed";
+	}
+
+	my $key;
+	my $kf = &keyfile( $host );
+	open( K, $kf )
+		or die "cannot open keyfile: $!";
+	while(<K>){
+		if( /^Key: (.*)/ ){
+			$key = $1;
+		}
+	}
+	close(K);
+
+	if( ! $key ){
+		die "key not found in keyfile";
+	}
+		
+	$dat->{$host}{key} = $key;
+	$dat->{$host}{user} ||= '';
+
+} elsif( $cmd eq "gen" ){
+	# nothing to do
+} 
+
+# save config
+rename( $conf, "$conf.old" )
+	or die "failed to backup config: $!";
+open(CONF, ">$conf" )
+	or die "cannot write config: $!";
+print CONF Dumper( $dat );
+close( CONF );
+
+# generate named.conf
+open(NDC, ">$ndc" )
+	or die "cannot write named config: $!";
+foreach my $host ( keys %$dat ){
+	my $e = $dat->{$host};
+	print NDC <<EOF;
+key $host. {
+	algorithm hmac-md5;
+	secret "$e->{key}";
+};
+
+EOF
+}
+close(NDC);
+
+sub keyfile {
+	my( $host ) = @_;
+	opendir( K, "." ) or die "cannot read key directory: $!";
+	my @f = grep { /^K$host\.\+\d+\+\d+\.private$/ } readdir(K);
+	closedir K;
+	return $f[0];
+}
+
+

@@ -50,6 +50,8 @@ install:
 	#$(MAKE) install DESTDIR=`pwd`/debian/tmp
 	$(MAKE) install PREFIX=$(TMP)/usr
 	mv $(TMP)/usr/bin/nspamper $(TMP)/usr/sbin/
+	mv $(TMP)/usr/bin/ddns $(TMP)/usr/sbin/
+	mv $(TMP)/usr/bin/dyn2nsup $(TMP)/usr/lib/cgi-bin/
 	cp nspamper.conf $(TMP)/etc
 	cp debian/ip-up $(TMP)/etc/ppp/ip-up.d/nspamper
 	chmod +x $(TMP)/etc/ppp/ip-up.d/nspamper

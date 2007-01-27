@@ -1,3 +1,10 @@
+nspamper (0.0.4) unstable; urgency=low
+
+  * added script to manage server keys
+  * added CGI to serve DynDNS clients
+
+ -- Rainer Clasen <bj@zuto.de>  Wed, 22 Mar 2006 16:57:15 +0100
+
 nspamper (0.0.3) unstable; urgency=low
 
   * use UNIX socket instead of fifo, need nspamper-change instead of echo
