@@ -41,7 +41,7 @@ my $sock = "/var/run/$prog.sock";
 my $pidfile = "/var/run/$prog.pid";
 my $conf = "/etc/$prog.conf";
 
-our $VERSION = "0.0.2";
+our $VERSION = "0.0.5";
 
 # read config
 -r $conf or die "missing config: $conf";
@@ -104,6 +104,34 @@ if( ! listen( SOCK, SOMAXCONN) ){
 
 my $wip = &read_ip;
 syslog( "debug", "old IP: $wip") if defined $wip;
+
+=pod
+
+TODO: use several NS
+TODO: add TXT records with timestamp for zone sync conflict resolution
+
+- get_ns()
+  - get _version._nspamper.<domain> TXT
+  - get <domain> SOA (no version)
+  - get _ns._nspamper.<domain> A? SRV? (version 1)
+
+- get_update_ns()
+  - foreach get_ns()
+    - if( ! $ns->already_done )
+      - get <hostname> A
+      - if( ! $ns->matches )
+        - push @update_ns, $ns
+
+- update_ns()
+  - update A and TXT record (with timestamp)
+
+- foreach( get_update_ns ){
+  - if( ! update_ns( $ns ) )
+    - $timeout = 10;
+
+- wait( $newip, $timeout )
+
+=cut
 
 my $timeout = undef;
 while(1){

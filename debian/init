@@ -12,8 +12,11 @@ PATH=/sbin:/bin:/usr/sbin:/usr/bin
 NAME=nspamper
 DAEMON=/usr/sbin/$NAME
 DESC="NS Pamper daemon"
+conf=/etc/nspamper.conf
 
 test -f $DAEMON || exit 0
+test -r $conf || exit 0
+grep '^exit\>' /etc/nspamper.conf >/dev/null && exit 0;
 
 set -e
 
@@ -28,6 +31,13 @@ case "$1" in
 	mkdir -p $piddir
 	start-stop-daemon --start --quiet --pidfile $pidfile \
 		--exec $DAEMON -- 
+
+	for f in $piddir/$NAME-boot.*; do
+		[ -r "$f" ] || continue;
+		nspamper-change `cat "$f"`
+		rm -f "$f"
+	done
+
 	echo "$NAME."
 	;;
   stop)

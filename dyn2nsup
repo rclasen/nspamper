@@ -94,6 +94,7 @@ sub doupdate {
 		&fail( "dnserr" );
 	}
 
+	# TODO: multiple NS, TXT records, ...
 	my $old = &Nspamper::get_ip( $ns, $fqdn );
 	if( ! $old || $old ne $ip ){
 		&Nspamper::set_ip( $ns, $dom, $key, $fqdn, $ip )

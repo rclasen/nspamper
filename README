@@ -1,5 +1,5 @@
-nspamper version 0.0.1
-======================
+nspamper
+========
 
 nspamper is a tiny daemon that takes care of updating a dynamic DNS name
 using Bind9 NSupdates. You still have to tell it the IP, but no longer

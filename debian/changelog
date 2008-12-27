@@ -1,3 +1,10 @@
+nspamper (0.0.5) unstable; urgency=low
+
+  * add support to remember IP when ppp link comes up while nspamperd isnt
+    running
+
+ -- Rainer Clasen <bj@zuto.de>  Sat, 27 Dec 2008 12:50:06 +0100
+
 nspamper (0.0.4) unstable; urgency=low
 
   * added script to manage server keys
