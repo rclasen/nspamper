@@ -19,9 +19,9 @@ This module requires these other modules and libraries:
   Net::DNS
   Sys::Syslog;
 
-COPYRIGHT AND LICENCE
+COPYRIGHT AND LICENSE
 
-GPL
+MIT License - see LICENSE file included in distribution
 
 Copyright (C) 2003 Rainer Clasen
 
