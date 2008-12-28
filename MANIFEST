@@ -1,8 +1,25 @@
+.cvsignore
 Changes
+ddns
+debian/.cvsignore
+debian/changelog
+debian/control
+debian/copyright
+debian/dirs
+debian/files
+debian/init
+debian/ip-up
+debian/logcheck.ignore.d
+debian/nspamper.substvars
+debian/README.Debian
+debian/rules
+dyn2nsup
+LICENSE
 Makefile.PL
 MANIFEST
+META.yml			Module meta-data (added by MakeMaker)
 nspamper
-nspamper.conf
 nspamper-change
+nspamper.conf
+Nspamper.pm
 README
-META.yml                                 Module meta-data (added by MakeMaker)
