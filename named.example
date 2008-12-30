@@ -1,0 +1,18 @@
+/*
+ * sample config for bind9, please adjust to your needs.
+ */
+
+include "/etc/bind/ddns-keys.conf";
+zone "dyn.example.com" {
+	type master;
+	file "/var/lib/bind/zone.example";
+
+	update-policy {
+		// allow updates to names matching the key name
+		// TXT will get used in the future
+		grant * self * A TXT;
+	};
+
+	allow-transfer { none; };
+};
+

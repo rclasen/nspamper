@@ -2,10 +2,6 @@
 exit 0
 
 if [ "$LINKNAME"x = tdslx ]; then
-	# During boot link might come up before nspamper is running.
-	# In this case IP is kept for init.d script.
-
-	( nspamper-change $PPP_LOCAL \
-		|| echo $PPP_LOCAL > /var/run/nspamper-boot.$PPP_IFACE )&
+	nspamper-change $PPP_LOCAL
 fi
 

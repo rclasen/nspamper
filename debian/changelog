@@ -1,3 +1,13 @@
+nspamper (0.0.6) unstable; urgency=low
+
+  * doc updates (README, man-pages)
+  * added command-line options (incl. --help)
+  * made all filenames configurable (commandline + config) to allow multiple
+    instances.
+  * moved fallback for stopped nspamper into nspamper-change
+
+ -- Rainer Clasen <bj@zuto.de>  Tue, 30 Dec 2008 22:34:22 +0100
+
 nspamper (0.0.5) unstable; urgency=low
 
   * add support to remember IP when ppp link comes up while nspamperd isnt

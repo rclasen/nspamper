@@ -15,7 +15,7 @@ use Data::Dumper;
 my $kdir = "/etc/bind/keys";
 my $conf = "/etc/bind/ddns.conf";
 my $ndc = "/etc/bind/ddns-keys.conf";
-my $domain = "dyn.zuto.de";
+#my $domain = "dyn.example.com";
 
 # TODO manpage
 
@@ -58,19 +58,18 @@ my $dat = do $conf
 	or die "cannot read config";
 
 #$dat = {
-#	"host"	=> {
+#	"host.dyn.example.org"	=> {
 #		key => "blah",
-#		user => "bj",
-#		pass => "cpw",
+#		user => "alice",
 #	},
 #};
 
 if( $cmd eq "host" ){
 	my( $host ) = lc shift;
 
-	if( $host !~ /^[a-z][a-z0-9-]*\.$domain$/ ){
-		die "invalid hostname";
-	}
+#	if( $host !~ /^[a-z][a-z0-9-]*\.$domain$/ ){
+#		die "invalid hostname";
+#	}
 
 	chdir $kdir || die "cannot change to key directory: $!";
 

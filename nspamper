@@ -14,73 +14,170 @@ nspamper - daemon to update dynamic DNS names
 
 =head1 SYNOPSIS
 
- nspamper
+ nspamper <options>
 
 =head1 DESCRIPTION
 
 This is a bind9 nsupdate client to keep a dynamic A record up to date
 
 Changes must be triggered using L<nspamper-change> which writes the new IP
-to a UNIX Socket.
+to a UNIX Socket. Permissions to this socket determin who's able to
+submitt new IPs.
 
 This daemon will retry to send the update until the Nameserver returns the
-proper IP.
+proper IP. Updates and IP verification are directly sent to the Nameserver
+listed in the Zone's SOA.
 
 Once the update was successfull, this script assumes, the server won't
 forget the IP and therefor sleeps until the IP is changed again.
 
-This has to run as daemon, to avoid problems with overlapping requests. That means it gracefully accepts a new IP although the current one wasn't accepted by the nameserver.
+This has to run as daemon, to avoid problems with overlapping requests.
+That means it gracefully accepts a new IP although the current one wasn't
+accepted by the nameserver, yet. 
+
+=head1 OPTIONS
+
+=over 4
+
+=item B<--config>=I<config>
+
+Config file to read hostname and tsig key from. See FILES for details.
+
+=item B<--[no]daemon>
+
+Do (not) detach from tty.
+
+=item B<--help>
+
+Displays short usage info.
+
+=item B<--key>=I<key-string>
+
+TSIG key string. BEWARE: this will show up within ps. Please use the
+config file for this.
+
+=item B<--name>=I<hostname>
+
+Dyndns hostname to take care of.
+
+=item B<--pidfile>=I<pidfile-path>
+
+Pidfile name.
+
+=item B<--socketpath>=I<socket-path>
+
+Alternative path for unix socket to listen on. Make sure you use the same
+path for nspamper-change.
+
+=item B<--statusfile>=I<status-file>
+
+File to store status information in.
+
+=back
 
 =cut
 
-# TODO: explain config
 
 use strict;
 use Sys::Syslog;
 use Socket;
 use POSIX;
 use Nspamper;
+use Getopt::Long;
 
-# TODO: getopt
 
+our $VERSION = "0.0.6";
 my $prog = "nspamper";
-my $ipfile = "/var/lib/misc/$prog.ip";
-my $sock = "/var/run/$prog.sock";
-my $pidfile = "/var/run/$prog.pid";
-my $conf = "/etc/$prog.conf";
 
-our $VERSION = "0.0.5";
+my $daemon = 1;
+my $conf = "/etc/$prog.conf";
+my $ostatusfile = "/var/lib/misc/$prog.ip";
+my $osocketpath = "/var/run/$prog.sock";
+my $opidfile = "/var/run/$prog.pid";
+my $oname;
+my $okey;
+
+my $wanthelp;
+my $needhelp;
+
+GetOptions(
+	"config=s"	=> \$conf,
+	"daemon!"	=> \$daemon,
+	"help|h!"	=> \$wanthelp,
+	"key=s"		=> \$okey,
+	"name=s"	=> \$oname,
+	"pidfile=s"	=> \$opidfile,
+	"socketpath=s"	=> \$osocketpath,
+	"statusfile=s"	=> \$ostatusfile,
+) || $needhelp++;
+
+if( $wanthelp ){
+	print <<EOF;
+usage: $0 [<options> ...]
+client daemon for dynaimc DNS / nsupdates
+
+options:
+ --config=<conf>      config file
+ --[no]daemon         do (not) detach from tty
+ --help|-h            this info
+ --key=<key>          TSIG key - be careful, discloses private key!!!
+ --name=<host>        hostname
+ --pidfile=<file>     where to record the process ID
+ --socketpath=<sock>  path for unix socket to listen on
+ --statusfile=<file>  file to keep status information in (last known IP)
+
+EOF
+	exit 0;
+}
+
+if( $needhelp ){
+	print STDERR "use $0 --help for usage info\n";
+	exit 0
+}
 
 # read config
--r $conf or die "missing config: $conf";
-use vars qw( $name $key );
-do $conf;
-#$name = "warp.dyn.zuto.de";
-#$key = 'blah==';
+our( $statusfile, $socketpath, $pidfile, $name, $key );
+if( -r $conf ){
+	do $conf;
+}
 
-unless( $name =~ /\.(.*)/ ){
+# set defaults / cmdline
+$statusfile ||= $ostatusfile;
+$socketpath ||= $osocketpath;
+$pidfile ||= $opidfile;
+$name ||= $oname;
+$key ||= $okey;
+
+unless( $name =~ /^[a-z][\w.]+$/ ){
 	print STDERR "invalid name: $name\n";
 	exit 1;
 }
 
+unless( $key =~ /^\S+==$/ ){
+	print STDERR "invalid TSIG key: $key\n";
+	exit 1;
+}
 
 # daemonize
 use vars qw( $cleanup );
+our $terminate;
 
-my $pid = fork;
-if( $pid < 0 ){
-	print STDERR "fork() failed: $!\n";
-	exit 1;
+if( $daemon ){
+	# TODO: close STDERR, detach tty
 
-} elsif( $pid > 0 ){
-	exit 0;
+	my $pid = fork;
+	if( $pid < 0 ){
+		print STDERR "fork() failed: $!\n";
+		exit 1;
+
+	} elsif( $pid > 0 ){
+		exit 0;
+	}
 }
 
 
-# TODO: close STDERR, detach tty
-
 openlog( $prog, "pid", "daemon" );
-syslog( "info", "starting" );
+syslog( "info", "starting for hostname $name" );
 &pidfile( $pidfile ) or exit 1;
 
 $cleanup++;
@@ -88,61 +185,38 @@ END {
 	if( $cleanup ){
 		syslog( "info", "exiting" );
 		close SOCK;
-		unlink $sock;
+		unlink $socketpath;
 		unlink $pidfile;
 	}
 }
 
-# TODO: catch SIGINT and SIGTERM
+$SIG{INT} = $SIG{TERM} = sub {
+	syslog( "info", "got SIG$_[0]" );
+	$terminate++;
+};
 
-unlink $sock;
+
+unlink $socketpath;
 if( ! socket( SOCK, PF_UNIX, SOCK_STREAM, 0 )){
 	syslog( "err", "failed to open socket: $!" );
 	exit 1;
 }
-if( ! bind( SOCK, sockaddr_un($sock)) ){
+if( ! bind( SOCK, sockaddr_un($socketpath)) ){
 	syslog( "err", "failed to bind socket: $!" );
 	exit 1;
 }
-chmod( 0770, $sock );
+chmod( 0770, $socketpath );
 if( ! listen( SOCK, SOMAXCONN) ){
 	syslog( "err", "failedt to listen: $!");
 	exit 1;
 }
 
 my $wip = &read_ip;
-syslog( "debug", "old IP: $wip") if defined $wip;
+$wip && syslog( "debug", "old IP: $wip");
 
-=pod
-
-TODO: use several NS
-TODO: add TXT records with timestamp for zone sync conflict resolution
-
-- get_ns()
-  - get _version._nspamper.<domain> TXT
-  - get <domain> SOA (no version)
-  - get _ns._nspamper.<domain> A? SRV? (version 1)
-
-- get_update_ns()
-  - foreach get_ns()
-    - if( ! $ns->already_done )
-      - get <hostname> A
-      - if( ! $ns->matches )
-        - push @update_ns, $ns
-
-- update_ns()
-  - update A and TXT record (with timestamp)
-
-- foreach( get_update_ns ){
-  - if( ! update_ns( $ns ) )
-    - $timeout = 10;
-
-- wait( $newip, $timeout )
-
-=cut
-
-my $timeout = undef;
+my $timeout = undef; # TODO: configurable
 while(1){
+	last if $terminate;
 
 	if( ! $wip ){
 		syslog( "info", "IP is not yet known" );
@@ -176,7 +250,7 @@ sub write_ip {
 
 	syslog( "info", "remembering new IP");
 	local *F;
-	if( ! open( F, ">$ipfile") ){
+	if( ! open( F, ">", $statusfile) ){
 		syslog( "err", "failed to write IP: $!" );
 		return;
 	}
@@ -184,16 +258,32 @@ sub write_ip {
 	close F;
 }
 
+sub is_ip {
+	my $in = shift
+		or return;
+
+	my @q = ( $in =~ /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/ )
+		or return;
+
+	foreach my $b( @q ){
+		return unless defined $b;
+		return if $b > 255;
+	}	
+	return 1;
+
+}
+
 # read stored IP on startup 
 sub read_ip {
 	local *F;
-	open( F, $ipfile ) or return;
+	open( F, "<", $statusfile ) or return;
 	my $ip = <F>;
 	close F;
 
 	chomp $ip;
-	return $ip if $ip =~ /^\d+\.\d+\.\d+\.\d+$/;
-	return undef;
+	&is_ip($ip)
+		or return;
+	return $ip;
 }
 
 # wait until we get a new IP
@@ -217,7 +307,7 @@ sub wait_newip {
 	close CLIENT;
 
 	chomp $ip;
-	return $ip if $ip =~ /^\d+\.\d+\.\d+\.\d+$/;
+	return $ip if &is_ip($ip);
 
 	syslog( "notice", "ignoring invalid IP" );
 	return undef;
@@ -229,7 +319,7 @@ sub pidfile {
 
 	my $pid = $$;
 	local *FH;
-	if( open( FH, $file )){
+	if( open( FH, "<", $file )){
 		# lockfile exists!
 
 		my $oldpid = <FH>;
@@ -246,7 +336,8 @@ sub pidfile {
 		}
 	}
 
-	if( ! sysopen(FH, $file, O_WRONLY | O_EXCL | O_CREAT, 0600) ){
+	# TODO: use Proc::PID::File
+	if( ! sysopen(FH, $file, O_WRONLY | O_EXCL | O_CREAT, 0644) ){
 		syslog( "err", "cannot create pidfile $file: $!" );
 		return;
 	}
@@ -257,10 +348,42 @@ sub pidfile {
 	return 1;
 }
 
+
 =head1 FILES
 
-/etc/nspamper.conf - config file. See commented example config for
-details.
+/etc/nspamper.conf - config file. Uses perl syntax. The following settings
+are known:
+
+=over 4
+
+=item B<$key> = 'I<...tsig key...>';
+
+TSIG key as generated with:
+
+ dnssec-keygen  -a HMAC-MD5 -b 512 -n USER <hostname>
+
+They look like:
+
+ abcdefghijklmnpfsuwjfsafjewuioglkgjosperjgfkcsigrekglfdgoegjfdsgisohruahfuiafduafdaasu==
+
+=item B<$name> = 'I<host.dyn.example.org>';
+
+Hostname to update.
+
+=item B<$pidfile> = 'I<pidfile-path>';
+
+Pidfile name.
+
+=item B<$socketpath> = 'I<socket-path>';
+
+Alternative path for unix socket to listen on. Make sure you use the same
+path for nspamper-change.
+
+=item B<$statusfile> = 'I<status-file>';
+
+File to store status information in.
+
+=back
 
 =head1 BUGS
 
@@ -269,11 +392,39 @@ more.
 
 =head1 AUTHOR
 
-Rainer Clasen
+Rainer Clasen E<lt>rc@zuto.deE<gt>
 
 =head1 SEE ALSO
 
 L<nspamper-change>, L<nsupdate>.
 
 =cut
+
+__END__
+
+TODO: use several NS
+TODO: add TXT records with timestamp for zone sync conflict resolution
+
+- get_ns()
+  - get _version._nspamper.<domain> TXT
+  - get <domain> SOA (no version)
+  - get _ns._nspamper.<domain> A? SRV? (version 1)
+
+- get_update_ns()
+  - foreach get_ns()
+    - if( ! $ns->already_done )
+      - get <hostname> A
+      - if( ! $ns->matches )
+        - push @update_ns, $ns
+
+- update_ns()
+  - update A and TXT record (with timestamp)
+
+- foreach( get_update_ns ){
+  - if( ! update_ns( $ns ) )
+    - $timeout = 10;
+
+- wait( $newip, $timeout )
+
+
 

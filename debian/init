@@ -31,13 +31,6 @@ case "$1" in
 	mkdir -p $piddir
 	start-stop-daemon --start --quiet --pidfile $pidfile \
 		--exec $DAEMON -- 
-
-	for f in $piddir/$NAME-boot.*; do
-		[ -r "$f" ] || continue;
-		nspamper-change `cat "$f"`
-		rm -f "$f"
-	done
-
 	echo "$NAME."
 	;;
   stop)

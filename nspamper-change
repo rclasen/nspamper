@@ -10,28 +10,171 @@
 
 =head1 NAME
 
-nspamper-change - client to infor nspamper of new IP
+nspamper-change - client to inform nspamper of IP change
 
 =head1 SYNOPSIS
 
- nspamper-change <IP>
+ nspamper-change [options] <address>
 
 =head1 DESCRIPTION
 
-This is a tiny client telling the nspamper daemon the IP it has to keep up to date.
+This is a tiny client telling the nspamper daemon the IP address it has to
+set the name to. When nspamper isn't running, the statusfile is updated so
+that it picks up the ip on next start.
+
+=head1 OPTIONS
+
+=over 4
+
+=item B<--config>=I<config>
+
+Nspamper config file. See L<nspamper> for the description.
+
+=item B<--help>
+
+Displays short usage info.
+
+=item B<--pidfile>=I<pidfile-path>
+
+Pidfile of nspamper.
+
+=item B<--socketpath>=I<socket-path>
+
+Unix socket nspamper is listening to.
+
+=item B<--statusfile>=I<status-file>
+
+File with status information of nspamper.
+
+=back
 
 =cut
 
 use strict;
 use Socket;
+use Getopt::Long;
 
-my $sock = "/var/run/nspamper.sock";
-my $ip = shift or die "missing IP";
+my $prog = 'nspamper';
 
-socket( SOCK, PF_UNIX, SOCK_STREAM, 0 ) || die "socket: $!";
-connect( SOCK, sockaddr_un( $sock )) || die "connect $!";
-print SOCK $ip, "\n";
-close SOCK;
+my $wanthelp;
+my $needhelp;
+
+my $conf = "/etc/$prog.conf";
+my $ostatusfile = "/var/lib/misc/$prog.ip";
+my $osocketpath = "/var/run/$prog.sock";
+my $opidfile = "/var/run/$prog.pid";
+
+GetOptions(
+	"config=s"	=> \$conf,
+	"help|h!"	=> \$wanthelp,
+	"pidfile=s"	=> \$opidfile,
+	"socketpath=s"	=> \$osocketpath,
+	"statusfile=s"	=> \$ostatusfile,
+) || $needhelp++;
+
+my $ip = shift;
+unless( is_ip($ip) ){
+	print STDERR "invalid IP address\n";
+	$needhelp++;
+}
+
+if( $wanthelp ){
+	print <<EOF;
+usage: $0 [<opt>] <ip>
+propagates IP address change to nspamper daemon.
+
+options:
+ --config=<conf>      config file
+ --help|-h            this info
+ --pidfile=<file>     nspamper pidfile
+ --socketpath=<sock>  nspamper unix socket
+ --statusfile=<file>  nspamper status file
+EOF
+	exit 0;
+}
+
+if( $needhelp ){
+	print STDERR "use --help for usage info\n";
+	exit 1;
+}
+
+# read config
+our( $statusfile, $socketpath, $pidfile, $name, $key );
+if( -r $conf ){
+	do $conf;
+}
+
+# set defaults / cmdline
+$statusfile ||= $ostatusfile;
+$socketpath ||= $osocketpath;
+$pidfile ||= $opidfile;
+
+send_ip( $ip ) || write_ip( $ip );
+
+# send ip to running nspamper
+sub send_ip {
+	my $ip = shift;
+
+	unless( socket( SOCK, PF_UNIX, SOCK_STREAM, 0 ) ){
+		print STDERR "socket failed: $!\n";
+		return;
+	}
+
+	unless( connect( SOCK, sockaddr_un( $socketpath )) ){
+		print STDERR "connect failed: $!\n";
+		return;
+	}
+
+	unless( print SOCK $ip, "\n" ){
+		print STDERR "write failed: $!\n";
+		return;
+	}
+
+	unless( close SOCK ){
+		print STDERR "close failed: $!\n";
+		return;
+	}
+
+	return 1;
+}
+
+# nspampr not running? -> fall back to $statefile
+# TODO: this doesn't work when nspamper started between send_ip and write_ip
+sub write_ip {
+	my $ip = shift;
+
+	if( open( my $pf, '<', $pidfile )){
+		my $pid = <$pf>;
+		if( $pid =~ /^\s*\d+\s*$/ && kill( 0, $pid )){
+			print STDERR "failed to update statusfile as nspamper runs\n";
+			return;
+		}
+		close($pf);
+	}
+
+	if( open( my $sf, '>', $statusfile )){
+		print $sf "$ip\n";
+		close($sf);
+		return;
+	}
+	print "failed writing statusfile: $!\n";
+}
+
+sub is_ip {
+	my $in = shift
+		or return;
+
+	my @q = ( $in =~ /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/ )
+		or return;
+
+	foreach my $b( @q ){
+		return unless defined $b;
+		return if $b > 255;
+	}	
+	return 1;
+
+}
+
 
 =head1 BUGS
 
@@ -39,7 +182,7 @@ I bet there are some.
 
 =head1 AUTHOR
 
-Rainer Clasen, E<lt>rc@zuto.deE<gt>
+Rainer Clasen E<lt>rc@zuto.deE<gt>
 
 =head1 SEE ALSO
 

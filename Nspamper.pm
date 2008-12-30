@@ -9,6 +9,10 @@
 
 package Nspamper;
 
+# TODO: pod
+
+use strict;
+use warnings;
 use Net::DNS;
 use Sys::Syslog;
 
@@ -26,14 +30,14 @@ sub get_nameserver {
 	my $res = new Net::DNS::Resolver;
 	my $query = $res->query( $domain, "SOA" );
 	if( ! $query ){
-		syslog( "notice", "failed to get NS for $dom: ".
+		syslog( "notice", "failed to get NS for $domain: ".
 			$res->errorstring );
 		return;
 	}
 
 	my $rr = ($query->answer)[0];
 	if( $rr->type ne "SOA" ){
-		syslog( "notice", "failed to get NS for $dom: ".
+		syslog( "notice", "failed to get NS for $domain: ".
 			"got non-SOA record");
 		return;
 	}
