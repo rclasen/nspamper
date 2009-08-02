@@ -86,7 +86,7 @@ use Nspamper;
 use Getopt::Long;
 
 
-our $VERSION = "0.0.6";
+our $VERSION = "0.0.7";
 my $prog = "nspamper";
 
 my $daemon = 1;

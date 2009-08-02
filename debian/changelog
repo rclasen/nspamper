@@ -1,3 +1,9 @@
+nspamper (0.0.7) unstable; urgency=low
+
+  * rebuild for lenny
+
+ -- Rainer Clasen <bj@zuto.de>  Sun, 02 Aug 2009 18:08:42 +0200
+
 nspamper (0.0.6) unstable; urgency=low
 
   * doc updates (README, man-pages)
