@@ -5,7 +5,8 @@ WriteMakefile(
     'NAME'		=> 'nspamper',
     'VERSION_FROM'	=> 'nspamper', # finds $VERSION
     'PREREQ_PM'		=> {
-    	Net::DNS	=> 0,
+	# update debian/control, too!
+    	'Net::DNS'	=> 0,
     	}, # e.g., Module::Name => 1.1
     'EXE_FILES'		=> [qw( 
     	nspamper 
