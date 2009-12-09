@@ -1,7 +1,7 @@
-.cvsignore
+.gitignore
 Changes
 ddns
-debian/.cvsignore
+debian/.gitignore
 debian/changelog
 debian/control
 debian/copyright
