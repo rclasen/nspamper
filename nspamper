@@ -2,7 +2,7 @@
 
 #
 # Copyright (c) 2008 Rainer Clasen
-# 
+#
 # This program is free software; you can redistribute it and/or modify
 # it under the terms described in the file LICENSE included in this
 # distribution.
@@ -33,7 +33,7 @@ forget the IP and therefor sleeps until the IP is changed again.
 
 This has to run as daemon, to avoid problems with overlapping requests.
 That means it gracefully accepts a new IP although the current one wasn't
-accepted by the nameserver, yet. 
+accepted by the nameserver, yet.
 
 =head1 OPTIONS
 
@@ -222,7 +222,7 @@ while(1){
 		syslog( "info", "IP is not yet known" );
 		goto GETIP;
 	}
-		
+
 	my( $dom, $ns ) = &Nspamper::get_domdat( $name ) or next;
 
 	my $cip = &Nspamper::get_ip( $ns, $name ) || "";
@@ -268,12 +268,12 @@ sub is_ip {
 	foreach my $b( @q ){
 		return unless defined $b;
 		return if $b > 255;
-	}	
+	}
 	return 1;
 
 }
 
-# read stored IP on startup 
+# read stored IP on startup
 sub read_ip {
 	local *F;
 	open( F, "<", $statusfile ) or return;

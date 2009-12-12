@@ -19,8 +19,8 @@ Description: daemon to update dynamic DNS names
  Once the update was successfull, this script assumes, the server won't
  forget the IP and therefor sleeps until the IP is changed again.
  .
- This has to run as daemon, to avoid problems with overlapping requests. 
- That means it gracefully accepts a new IP although the current one wasn't 
+ This has to run as daemon, to avoid problems with overlapping requests.
+ That means it gracefully accepts a new IP although the current one wasn't
  accepted by the nameserver.
  .
  Within this package is a tool to manage the Nameserver keys and a CGI

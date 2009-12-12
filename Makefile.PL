@@ -8,8 +8,8 @@ WriteMakefile(
 	# update debian/control, too!
     	'Net::DNS'	=> 0,
     	}, # e.g., Module::Name => 1.1
-    'EXE_FILES'		=> [qw( 
-    	nspamper 
+    'EXE_FILES'		=> [qw(
+    	nspamper
 	nspamper-change
 	ddns
 	dyn2nsup

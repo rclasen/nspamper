@@ -2,7 +2,7 @@
 
 #
 # Copyright (c) 2008 Rainer Clasen
-# 
+#
 # This program is free software; you can redistribute it and/or modify
 # it under the terms described in the file LICENSE included in this
 # distribution.
@@ -170,7 +170,7 @@ sub is_ip {
 	foreach my $b( @q ){
 		return unless defined $b;
 		return if $b > 255;
-	}	
+	}
 	return 1;
 
 }

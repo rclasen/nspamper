@@ -30,12 +30,12 @@ case "$1" in
 	echo -n "Starting $DESC: "
 	mkdir -p $piddir
 	start-stop-daemon --start --quiet --pidfile $pidfile \
-		--exec $DAEMON -- 
+		--exec $DAEMON --
 	echo "$NAME."
 	;;
   stop)
 	echo -n "Stopping $DESC: "
-	start-stop-daemon --oknodo --stop --quiet --pidfile $pidfile 
+	start-stop-daemon --oknodo --stop --quiet --pidfile $pidfile
 	echo "$NAME."
 	;;
   restart|force-reload)

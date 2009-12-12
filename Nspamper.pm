@@ -1,7 +1,7 @@
 
 #
 # Copyright (c) 2008 Rainer Clasen
-# 
+#
 # This program is free software; you can redistribute it and/or modify
 # it under the terms described in the file LICENSE included in this
 # distribution.
@@ -50,7 +50,7 @@ sub get_nameserver {
 			$res->errorstring );
 		return;
 	}
-	
+
 	$rr = ($query->answer)[0];
 	if( $rr->type ne "A" ){
 		syslog( "notice", "failed to get NS IP for $master: ".

@@ -2,7 +2,7 @@
 
 #
 # Copyright (c) 2008 Rainer Clasen
-# 
+#
 # This program is free software; you can redistribute it and/or modify
 # it under the terms described in the file LICENSE included in this
 # distribution.
@@ -54,7 +54,7 @@ if( $needhelp ){
 }
 
 
-my $dat = do $conf 
+my $dat = do $conf
 	or die "cannot read config";
 
 #$dat = {
@@ -75,7 +75,7 @@ if( $cmd eq "host" ){
 
 	if( ! &keyfile( $host ) ){
 		print "generating new key\n";
-		system( "/usr/sbin/dnssec-keygen  -a HMAC-MD5 -b 512 -n USER $host") == 0 
+		system( "/usr/sbin/dnssec-keygen  -a HMAC-MD5 -b 512 -n USER $host") == 0
 			or die "keygen failed";
 	}
 
@@ -93,13 +93,13 @@ if( $cmd eq "host" ){
 	if( ! $key ){
 		die "key not found in keyfile";
 	}
-		
+
 	$dat->{$host}{key} = $key;
 	$dat->{$host}{user} ||= '';
 
 } elsif( $cmd eq "gen" ){
 	# nothing to do
-} 
+}
 
 # save config
 rename( $conf, "$conf.old" )
