@@ -215,24 +215,24 @@ if( ! listen( SOCK, SOMAXCONN) ){
 	exit 1;
 }
 
-my $wip = &read_ip;
-$wip && syslog( "debug", "old IP: $wip");
+my $want_ip = &read_ip;
+$want_ip && syslog( "debug", "old IP: $want_ip");
 
 my $timeout = undef; # TODO: configurable
 while(1){
 	last if $terminate;
 
-	if( ! $wip ){
+	if( ! $want_ip ){
 		syslog( "info", "IP is not yet known" );
 		goto GETIP;
 	}
 
 	my( $dom, $ns ) = &Nspamper::get_domdat( $name ) or next;
 
-	my $cip = &Nspamper::get_ip( $ns, $name ) || "";
-	if( ! $cip or $cip ne $wip ){
-		syslog( "debug", "current IP: $cip");
-		if( &Nspamper::set_ip( $ns, $dom, $key, $name, $wip ) ){
+	my $cur_ip = &Nspamper::get_ip( $ns, $name ) || "";
+	if( ! $cur_ip or $cur_ip ne $want_ip ){
+		syslog( "debug", "current IP: $cur_ip");
+		if( &Nspamper::set_ip( $ns, $dom, $key, $name, $want_ip ) ){
 			$timeout = undef;
 		} else {
 			$timeout = 10;
@@ -240,11 +240,11 @@ while(1){
 	}
 
 GETIP:
-	my $nip = &wait_newip( $timeout );
-	if( $nip ){
-		$wip = $nip;
-		syslog( "info", "new IP: $wip");
-		&write_ip( $wip );
+	my $new_ip = &wait_newip( $timeout );
+	if( $new_ip ){
+		$want_ip = $new_ip;
+		syslog( "info", "new IP: $want_ip");
+		&write_ip( $want_ip );
 	}
 }
 
