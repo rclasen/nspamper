@@ -1,3 +1,9 @@
+nspamper (0.1.0) unstable; urgency=low
+
+  * added support for multiple names
+
+ -- Rainer Clasen <bj@zuto.de>  Tue, 07 Sep 2010 15:17:20 +0200
+
 nspamper (0.0.7) unstable; urgency=low
 
   * rebuild for lenny
