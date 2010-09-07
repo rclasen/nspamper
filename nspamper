@@ -148,19 +148,20 @@ $pidfile ||= $opidfile;
 $name ||= $oname;
 $key ||= $okey;
 
+our $terminate;
 unless( $name =~ /^[a-z][\w.]+$/ ){
 	print STDERR "invalid name: $name\n";
-	exit 1;
+	++$terminate;
 }
 
 unless( $key =~ /^\S+==$/ ){
 	print STDERR "invalid TSIG key: $key\n";
-	exit 1;
+	++$terminate;
 }
+exit 1 if $terminate;
 
 # daemonize
 use vars qw( $cleanup );
-our $terminate;
 
 if( $daemon ){
 	# TODO: close STDERR, detach tty
