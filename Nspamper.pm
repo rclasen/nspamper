@@ -71,14 +71,14 @@ sub get_ip {
 	$res->nameservers($ns);
 	my $query = $res->query( $name, "A" );
 	if( ! $query ){
-		syslog( "notice", "failed to get current IP: ".
+		syslog( "notice", "failed to resolve $name: ".
 			$res->errorstring );
 		return;
 	}
 
 	my $rr = ($query->answer)[0];
 	if( $rr->type ne "A" ){
-		syslog( "notice", "failed to get current IP: ".
+		syslog( "notice", "failed to resolve $name: ".
 			"got no A record" );
 		return;
 	}
