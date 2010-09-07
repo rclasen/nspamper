@@ -138,7 +138,10 @@ if( $needhelp ){
 # read config
 our( $statusfile, $socketpath, $pidfile, $name, $key );
 if( -r $conf ){
-	do $conf;
+	if( ! do $conf ){
+		print STDERR "failed to read $conf\n";
+		exit 1;
+	}
 }
 
 # set defaults / cmdline
