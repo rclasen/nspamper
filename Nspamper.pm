@@ -90,8 +90,6 @@ sub get_ip {
 sub set_ip {
 	my( $ns, $dom, $key, $name, $ip ) = @_;
 
-	syslog( "debug", "updating $name=$ip");
-
 	my $upd = Net::DNS::Update->new( $dom );
 	$upd->push( "update", rr_del("$name A"));
 	$upd->push( "update", rr_add("$name 1 A $ip"));
@@ -111,6 +109,8 @@ sub set_ip {
 			$res->errorstring );
 		return;
 	}
+
+	syslog( "info", "updated $name=$ip");
 
 	return 1;
 }
