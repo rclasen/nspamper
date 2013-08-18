@@ -42,6 +42,7 @@ if( $sys !~ /^(dyndns|statdns|custom)$/i ){
 }
 
 my $myip = param("myip") || $ENV{REMOTE_ADDR};
+$myip =~ s/^::ffff://i if $myip;
 if( ! &is_ip($myip) ){
 	&fail( "nohost" );
 }
