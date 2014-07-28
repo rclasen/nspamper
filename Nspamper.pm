@@ -71,6 +71,8 @@ sub get_ip {
 	$res->nameservers($ns);
 	my $query = $res->query( $name, "A" );
 	if( ! $query ){
+		# TODO: don't complain about nxdomain
+		# TODO: delete cnames
 		syslog( "notice", "failed to resolve $name: ".
 			$res->errorstring );
 		return;

@@ -9,14 +9,13 @@ debian/dirs
 debian/files
 debian/init
 debian/ip-up
-debian/logcheck.ignore.d
 debian/nspamper.substvars
 debian/rules
 dyn2nsup
 LICENSE
 Makefile.PL
 MANIFEST
-META.yml			Module meta-data (added by MakeMaker)
+MYMETA.yml
 nspamper
 nspamper-change
 nspamper.conf
