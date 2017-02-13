@@ -76,6 +76,9 @@ if( $#hostnames < 0 ){
 	&fail( "numhost" );
 }
 # TODO: check hostnames more paranoid
+
+my $pamper = Nspamper->new;
+
 foreach my $hostname ( @hostnames ){
 	if( ! exists $hosts->{$hostname} ){
 		&fail( "nohost" );
@@ -106,20 +109,16 @@ sub is_ip {
 sub doupdate {
 	my( $fqdn, $ip, $key ) = @_;
 
-	my( $dom, $ns  ) = &Nspamper::get_domdat( $fqdn );
-	if( ! $ns or ! $dom ){
-		syslog("err", "failed to get Domain data");
-		&fail( "dnserr" );
-	}
+	my( $host, $domain ) = split /\./, 2, $fqdn;
 
-	# TODO: multiple NS, TXT records, ...
-	my $old = &Nspamper::get_ip( $ns, $fqdn );
-	if( ! $old || $old ne $ip ){
-		&Nspamper::set_ip( $ns, $dom, $key, $fqdn, $ip )
-			or &fail( "dnserr" );
-	} else {
-		&fail( "nochg" );
-	}
+	my $changes = $pamper->compare( $domain, $host, {
+		'A' => $ip,
+	}) or &fail( 'dnserr' );
+
+	@$changes or &fail( "nochg" );
+
+	$pamper->update( $key, $changes )
+		or &fail( "dnserr" );
 }
 
 sub fail {

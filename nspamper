@@ -94,8 +94,6 @@ my $conf = "/etc/$prog.conf";
 my $ostatusfile = "/var/lib/misc/$prog.ip";
 my $osocketpath = "/var/run/$prog.sock";
 my $opidfile = "/var/run/$prog.pid";
-my $oname;
-my $okey;
 
 my $wanthelp;
 my $needhelp;
@@ -104,8 +102,6 @@ GetOptions(
 	"config=s"	=> \$conf,
 	"daemon!"	=> \$daemon,
 	"help|h!"	=> \$wanthelp,
-	"key=s"		=> \$okey,
-	"name=s"	=> \$oname,
 	"pidfile=s"	=> \$opidfile,
 	"socketpath=s"	=> \$osocketpath,
 	"statusfile=s"	=> \$ostatusfile,
@@ -120,8 +116,6 @@ options:
  --config=<conf>      config file
  --[no]daemon         do (not) detach from tty
  --help|-h            this info
- --key=<key>          TSIG key - be careful, discloses private key!!!
- --name=<host>        hostname
  --pidfile=<file>     where to record the process ID
  --socketpath=<sock>  path for unix socket to listen on
  --statusfile=<file>  file to keep status information in (last known IP)
@@ -136,7 +130,7 @@ if( $needhelp ){
 }
 
 # read config
-our( $statusfile, $socketpath, $pidfile, $name, $key, @names );
+our( $statusfile, $socketpath, $pidfile, @names );
 if( -r $conf ){
 	if( ! do $conf ){
 		print STDERR "failed to read $conf\n";
@@ -148,15 +142,6 @@ if( -r $conf ){
 $statusfile ||= $ostatusfile;
 $socketpath ||= $osocketpath;
 $pidfile ||= $opidfile;
-$name ||= $oname;
-$key ||= $okey;
-
-if( $name or $key ){
-	push @names, {
-		name	=> $name,
-		key	=> $key,
-	};
-}
 
 if( ! @names ){
 	print STDERR "no names configured, exiting\n";
@@ -165,13 +150,19 @@ if( ! @names ){
 
 our $terminate;
 foreach my $ent ( @names ){
-	unless( $ent->{name} =~ /^[a-z][\w.]+$/ ){
-		print STDERR "invalid name: $ent->{name}\n";
+	# TODO: automagically split name -> host + domain
+	unless( $ent->{domain} =~ /^[a-z][\w.]+$/ ){
+		print STDERR "invalid domain: $ent->{domain}\n";
+		++$terminate;
+	}
+
+	unless( $ent->{host} =~ /^[a-z][\w.]+$/ ){
+		print STDERR "invalid name: $ent->{host}\n";
 		++$terminate;
 	}
 
 	unless( $ent->{key} =~ /^\S+==$/ ){
-		print STDERR "invalid TSIG key for $ent->{name}: $ent->{key}\n";
+		print STDERR "invalid TSIG key for $ent->{host}: $ent->{key}\n";
 		++$terminate;
 	}
 }
@@ -241,25 +232,38 @@ while(1){
 		goto GETIP;
 	}
 
+	my $pamper = Nspamper->new;
+
 	my $retry;
 	foreach my $ent ( @names ){
 		next if $ent->{updated};
-		syslog( "debug", "checking $ent->{name}");
 
-		my( $dom, $ns ) = &Nspamper::get_domdat( $ent->{name} ) or next;
+		my $name = "$ent->{host}.$ent->{domain}";
+		syslog( "debug", "checking $name");
 
-		my $cur_ip = &Nspamper::get_ip( $ns, $ent->{name} ) || "";
-		if( ! $cur_ip or $cur_ip ne $want_ip ){
-			syslog( "debug", "current $ent->{name}=$cur_ip");
-			if( &Nspamper::set_ip( $ns, $dom,
-				$ent->{key}, $ent->{name}, $want_ip ) ){
+		my $changes = $pamper->compare(
+			$ent->{domain},
+			$ent->{host},
+			{ A => $want_ip },
+		);
 
-				++ $ent->{updated};
-			} else {
-				++$retry;
-			}
+		if( ! $changes ){
+			syslog( "notice", "failed to check changes for $name");
+			++$retry;
+
+		} elsif( ! @$changes ){
+			syslog( "debug", "no changes for $name");
+			++$ent->{updated};
+
 		} else {
-			++ $ent->{updated};
+			syslog( "debug", "updating $ent->{host}");
+			if( ! $pamper->update( $ent->{key}, $changes ) ){
+				syslog( "notice", "failed to update $name");
+				++$retry;
+			} else {
+				syslog( "debug", "updated $name");
+				++$ent->{updated};
+			}
 		}
 	}
 	$timeout = $retry ? 10 : undef;
@@ -390,7 +394,19 @@ are known:
 
 =over 4
 
-=item B<$key> = 'I<...tsig key...>';
+=item B<@names> = (I<hashrefs_of_name_and_key>)
+
+List of hostnames and keys.
+
+ @names = ({
+    name => "host1",
+    domain => "dyn.example.org",
+    key => "<key1>",
+ }, {
+    name => "host2",
+    domain => "dyn.example.org",
+    key => "<key2>",
+ });
 
 TSIG key as generated with:
 
@@ -399,22 +415,6 @@ TSIG key as generated with:
 They look like:
 
  abcdefghijklmnpfsuwjfsafjewuioglkgjosperjgfkcsigrekglfdgoegjfdsgisohruahfuiafduafdaasu==
-
-=item B<$name> = 'I<host.dyn.example.org>';
-
-Hostname to update.
-
-=item B<@names> = (I<hashrefs_of_name_and_key>)
-
-List of hostnames and keys.
-
- @names = ({
-    name = "host1.dyn.example.org",
-    key = "<key1>",
- }, {
-    name = "host2.dyn.example.org",
-    key = "<key2>",
- });
 
 =item B<$pidfile> = 'I<pidfile-path>';
 
