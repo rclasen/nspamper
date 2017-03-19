@@ -2,6 +2,6 @@
 exit 0
 
 if [ "$LINKNAME"x = tdslx ]; then
-	nspamper-change --link $LINKNAME $PPP_LOCAL
+	nspamper-change --link $LINKNAME no6
 fi
 

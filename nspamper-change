@@ -14,7 +14,7 @@ nspamper-change - client to inform nspamper of IP change
 
 =head1 SYNOPSIS
 
- nspamper-change [options] <address>
+ nspamper-change [options] <address1> [<address2>]
 
 =head1 DESCRIPTION
 
@@ -25,6 +25,10 @@ that it picks up the ip on next start.
 =head1 OPTIONS
 
 =over 4
+
+=item B<--link>=I<name>
+
+update names with this link tag in nspamper config 
 
 =item B<--config>=I<config>
 
@@ -42,9 +46,9 @@ Pidfile of nspamper.
 
 Unix socket nspamper is listening to.
 
-=item B<--statusfile>=I<status-file>
+=item B<--statuspath>=I<status-path>
 
-File with status information of nspamper.
+Files with status information of nspamper: link.type
 
 =back
 
@@ -53,29 +57,70 @@ File with status information of nspamper.
 use strict;
 use Socket;
 use Getopt::Long;
+use NetAddr::IP;
 
 my $prog = 'nspamper';
 
 my $wanthelp;
 my $needhelp;
 
+sub needhelp {
+	print STDERR "@_\n";
+	++$needhelp;
+}
+
 my $conf = "/etc/$prog.conf";
-my $ostatusfile = "/var/lib/misc/$prog.ip";
+my $ostatuspath = "/var/lib/$prog";
 my $osocketpath = "/var/run/$prog.sock";
 my $opidfile = "/var/run/$prog.pid";
+my $link = 'default';
 
 GetOptions(
 	"config=s"	=> \$conf,
 	"help|h!"	=> \$wanthelp,
 	"pidfile=s"	=> \$opidfile,
 	"socketpath=s"	=> \$osocketpath,
-	"statusfile=s"	=> \$ostatusfile,
-) || $needhelp++;
+	"statuspath=s"	=> \$ostatuspath,
+	"link=s"	=> \$link,
+) || ++$needhelp;
 
-my $ip = shift;
-unless( is_ip($ip) ){
-	print STDERR "invalid IP address\n";
-	$needhelp++;
+my %rr;
+
+if( @ARGV < 1 ){
+	needhelp "missing arguments";
+
+} elsif( @ARGV > 2 ){
+	needhelp "too many arguments";
+
+} else {
+	foreach my $a ( @ARGV ){
+		if( $a eq 'no4' ){
+			exists $rr{A}
+				and needhelp "need addresses of different protocols";
+
+			$rr{A} = '';
+
+		} elsif( $a eq 'no6' ){
+			exists $rr{AAAA}
+				and needhelp "need addresses of different protocols";
+
+			$rr{AAAA} = '';
+
+		} elsif( my $na = eval { NetAddr::IP->new($a) } ){
+			$na->masklen == $na->bits
+				or needhelp "no host address: $a";
+
+			my $rr = $na->version == 4 ? 'A' : 'AAAA';
+
+			exists $rr{$rr}
+				and needhelp "need addresses of different protocols";
+
+			$rr{$rr} = $na->addr;
+
+		} else {
+			needhelp "invalid address: $a";
+		}
+	}
 }
 
 if( $wanthelp ){
@@ -88,7 +133,7 @@ options:
  --help|-h            this info
  --pidfile=<file>     nspamper pidfile
  --socketpath=<sock>  nspamper unix socket
- --statusfile=<file>  nspamper status file
+ --statuspath=<dif>   nspamper status path
 EOF
 	exit 0;
 }
@@ -99,22 +144,20 @@ if( $needhelp ){
 }
 
 # read config
-our( $statusfile, $socketpath, $pidfile, $name, $key );
+our( $statuspath, $socketpath, $pidfile, $name, $key );
 if( -r $conf ){
 	do $conf;
 }
 
 # set defaults / cmdline
-$statusfile ||= $ostatusfile;
+$statuspath ||= $ostatuspath;
 $socketpath ||= $osocketpath;
 $pidfile ||= $opidfile;
 
-send_ip( $ip ) || write_ip( $ip );
+&send_update || &write_status;
 
 # send ip to running nspamper
-sub send_ip {
-	my $ip = shift;
-
+sub send_update {
 	unless( socket( SOCK, PF_UNIX, SOCK_STREAM, 0 ) ){
 		print STDERR "socket failed: $!\n";
 		return;
@@ -125,9 +168,11 @@ sub send_ip {
 		return;
 	}
 
-	unless( print SOCK $ip, "\n" ){
-		print STDERR "write failed: $!\n";
-		return;
+	foreach my $t ( sort keys %rr ){
+		unless( print SOCK "$link $t $rr{$t}\n" ){
+			print STDERR "write failed: $!\n";
+			return;
+		}
 	}
 
 	unless( close SOCK ){
@@ -140,9 +185,9 @@ sub send_ip {
 
 # nspampr not running? -> fall back to $statefile
 # TODO: this doesn't work when nspamper started between send_ip and write_ip
-sub write_ip {
-	my $ip = shift;
+# TODO; use locking for statuspath, instead
 
+sub write_status {
 	if( open( my $pf, '<', $pidfile )){
 		my $pid = <$pf>;
 		if( $pid =~ /^\s*\d+\s*$/ && kill( 0, $pid )){
@@ -152,27 +197,29 @@ sub write_ip {
 		close($pf);
 	}
 
-	if( open( my $sf, '>', $statusfile )){
-		print $sf "$ip\n";
-		close($sf);
-		return;
+	my $fail;
+
+	foreach my $t ( sort keys %rr ){
+		&write_file( $link, $t, $rr{$t} )
+			or ++$fail;
 	}
-	print "failed writing statusfile: $!\n";
+
+	return !$fail;
 }
 
-sub is_ip {
-	my $in = shift
-		or return;
+sub write_file {
+	my( $link, $type, $data ) = @_;
 
-	my @q = ( $in =~ /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/ )
-		or return;
+	my $fn = "$statuspath/$link.$type";
 
-	foreach my $b( @q ){
-		return unless defined $b;
-		return if $b > 255;
+	if( open( my $sf, '>', $fn )){
+		print $sf "$data\n";
+		close($sf);
+		return 1;
 	}
-	return 1;
 
+	print STDERR "failed to update statusfile $fn: $!\n";
+	return;
 }
 
 

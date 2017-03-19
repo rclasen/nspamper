@@ -1,6 +1,9 @@
 etc
+etc/ppp/ip-down.d
 etc/ppp/ip-up.d
-var/lib/misc
+etc/ppp/ipv6-down.d
+etc/ppp/ipv6-up.d
+var/lib/nspamper
 var/run
 usr/sbin
 usr/lib/cgi-bin

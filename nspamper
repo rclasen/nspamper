@@ -69,9 +69,9 @@ Pidfile name.
 Alternative path for unix socket to listen on. Make sure you use the same
 path for nspamper-change.
 
-=item B<--statusfile>=I<status-file>
+=item B<--statuspath>=I<status-path>
 
-File to store status information in.
+path to store status information in.
 
 =back
 
@@ -91,7 +91,7 @@ my $prog = "nspamper";
 
 my $daemon = 1;
 my $conf = "/etc/$prog.conf";
-my $ostatusfile = "/var/lib/misc/$prog.ip";
+my $ostatuspath = "/var/lib/$prog";
 my $osocketpath = "/var/run/$prog.sock";
 my $opidfile = "/var/run/$prog.pid";
 
@@ -104,7 +104,7 @@ GetOptions(
 	"help|h!"	=> \$wanthelp,
 	"pidfile=s"	=> \$opidfile,
 	"socketpath=s"	=> \$osocketpath,
-	"statusfile=s"	=> \$ostatusfile,
+	"statuspath=s"	=> \$ostatuspath,
 ) || $needhelp++;
 
 if( $wanthelp ){
@@ -118,7 +118,7 @@ options:
  --help|-h            this info
  --pidfile=<file>     where to record the process ID
  --socketpath=<sock>  path for unix socket to listen on
- --statusfile=<file>  file to keep status information in (last known IP)
+ --statuspath=<dir>   path to keep status information in (last known IP)
 
 EOF
 	exit 0;
@@ -130,7 +130,7 @@ if( $needhelp ){
 }
 
 # read config
-our( $statusfile, $socketpath, $pidfile, @names );
+our( $statuspath, $socketpath, $pidfile, @names );
 if( -r $conf ){
 	if( ! do $conf ){
 		print STDERR "failed to read $conf\n";
@@ -139,7 +139,7 @@ if( -r $conf ){
 }
 
 # set defaults / cmdline
-$statusfile ||= $ostatusfile;
+$statuspath ||= $ostatuspath;
 $socketpath ||= $osocketpath;
 $pidfile ||= $opidfile;
 
@@ -149,6 +149,13 @@ if( ! @names ){
 }
 
 our $terminate;
+my %want;
+
+our %rr = (
+	A	=> 1,
+	AAAA	=> 1,
+);
+
 foreach my $ent ( @names ){
 	# TODO: automagically split name -> host + domain
 	unless( $ent->{domain} =~ /^[a-z][\w.]+$/ ){
@@ -165,6 +172,12 @@ foreach my $ent ( @names ){
 		print STDERR "invalid TSIG key for $ent->{host}: $ent->{key}\n";
 		++$terminate;
 	}
+
+	$ent->{updated} = 0;
+
+	$ent->{link} ||= 'default';
+
+	$want{$ent->{link}} = {};
 }
 exit 1 if $terminate;
 
@@ -220,23 +233,19 @@ if( ! listen( SOCK, SOMAXCONN) ){
 	exit 1;
 }
 
-my $want_ip = &read_ip;
-$want_ip && syslog( "debug", "old IP: $want_ip");
+&read_status;
 
-my $timeout = undef; # TODO: configurable
+my $timeout = undef;
 while(1){
 	last if $terminate;
-
-	if( ! $want_ip ){
-		syslog( "info", "IP is not yet known" );
-		goto GETIP;
-	}
 
 	my $pamper = Nspamper->new;
 
 	my $retry;
 	foreach my $ent ( @names ){
 		next if $ent->{updated};
+		my $want = $want{$ent->{link}}
+			or next;
 
 		my $name = "$ent->{host}.$ent->{domain}";
 		syslog( "debug", "checking $name");
@@ -244,7 +253,7 @@ while(1){
 		my $changes = $pamper->compare(
 			$ent->{domain},
 			$ent->{host},
-			{ A => $want_ip },
+			$want,
 		);
 
 		if( ! $changes ){
@@ -266,34 +275,66 @@ while(1){
 			}
 		}
 	}
-	$timeout = $retry ? 10 : undef;
 
-GETIP:
-	my $new_ip = &wait_newip( $timeout );
-	if( $new_ip ){
-		$want_ip = $new_ip;
-		syslog( "info", "new IP: $want_ip");
-		&write_ip( $want_ip );
+	$timeout = $retry ? 10 : undef; # TODO: configurable
+	syslog( "debug", "waiting for IP change" ) unless $timeout;
 
-		foreach my $ent ( @names ){
-			$ent->{updated} = 0;
+	my $rin = '';
+	vec( $rin, fileno(SOCK), 1 ) = 1;
+	if( 0 >= select( $rin, undef, undef, $timeout ) ){
+		next;
+	}
+
+	if( ! accept( CLIENT, SOCK) ){
+		syslog( "err", "accept failed: $!" );
+		next;
+	}
+
+	while(<CLIENT>){
+		chomp;
+		syslog( "debug", "got: $_");
+
+		my( $link, $rr, $data ) = split(/\s/, $_, 3);
+
+		if( ! $want{$link} ){
+			syslog( "err", "update for unknown link: $link");
+			next;
 		}
 
+		if( ! $rr{$rr} ){
+			syslog( "err", "update for unknown type: $rr");
+			next;
+		}
+
+		# TODO: check data
+		$want{$link}{$rr} = $data;
+		&write_status_rr( $link, $rr, $data );
+
+		foreach my $ent ( @names ){
+			$ent->{link} eq $link
+				or next;
+
+			$ent->{updated} = 0;
+		}
 	}
 }
 
-# remember IP for restart
-sub write_ip {
-	my( $ip ) = @_;
 
-	syslog( "info", "remembering new IP");
-	local *F;
-	if( ! open( F, ">", $statusfile) ){
-		syslog( "err", "failed to write IP: $!" );
-		return;
+# remember IP for restart
+sub write_status_rr {
+	my( $link, $rr, $data ) = @_;
+
+	syslog( "info", "remembering new $link/$rr data");
+
+	my $fn = "$statuspath/$link.$rr";
+	if( ! open( my $fh, ">", $fn) ){
+		print $fh "$data\n";
+		close $fh;
+		return 1;
 	}
-	print F "$ip\n";
-	close F;
+
+	syslog( "err", "failed to open $fn: $!" );
+	return;
 }
 
 sub is_ip {
@@ -312,43 +353,40 @@ sub is_ip {
 }
 
 # read stored IP on startup
-sub read_ip {
-	local *F;
-	open( F, "<", $statusfile ) or return;
-	my $ip = <F>;
-	close F;
+sub read_status {
+	my $fail;
 
-	chomp $ip;
-	&is_ip($ip)
-		or return;
-	return $ip;
+	foreach my $link ( sort keys %want ){
+		foreach my $rr ( sort keys %rr ){
+			&read_status_rr( $link, $rr )
+				or ++$fail;
+		}
+	}
+
+	return !$fail;
+}
+
+sub read_status_rr {
+	my( $link, $rr ) = @_;
+
+	my $fn = "$statuspath/$link.$rr";
+
+	open( my $fh, "<", $fn ) or return;
+	my $data = <$fh>;
+	close $fh;
+
+	chomp $data;
+	# TODO: check data
+
+	$want{$link}{$rr} = $data;
+
+	return 1;
 }
 
 # wait until we get a new IP
 sub wait_newip {
 	my( $timeout ) = @_;
 
-	syslog( "debug", "waiting for IP change" ) unless $timeout;
-
-	my $rin = '';
-	vec( $rin, fileno(SOCK), 1 ) = 1;
-	if( 0 >= select( $rin, undef, undef, $timeout ) ){
-		return;
-	}
-
-	if( ! accept( CLIENT, SOCK) ){
-		syslog( "err", "accept failed: $!" );
-		return;
-	}
-
-	my $ip = <CLIENT>;
-	close CLIENT;
-
-	chomp $ip;
-	return $ip if &is_ip($ip);
-
-	syslog( "notice", "ignoring invalid IP" );
-	return undef;
 }
 
 
@@ -356,12 +394,11 @@ sub pidfile {
 	my $file = shift;
 
 	my $pid = $$;
-	local *FH;
-	if( open( FH, "<", $file )){
+	if( open( my $fh, "<", $file )){
 		# lockfile exists!
 
-		my $oldpid = <FH>;
-		close(FH);
+		my $oldpid = <$fh>;
+		close($fh);
 		chomp $oldpid;
 
 		if( ($oldpid =~ /^\d+$/) && ! kill 0, $oldpid ){
@@ -375,15 +412,14 @@ sub pidfile {
 	}
 
 	# TODO: use Proc::PID::File
-	if( ! sysopen(FH, $file, O_WRONLY | O_EXCL | O_CREAT, 0644) ){
-		syslog( "err", "cannot create pidfile $file: $!" );
-		return;
+	if( sysopen(my $fh, $file, O_WRONLY | O_EXCL | O_CREAT, 0644) ){
+		print $fh $pid, "\n";
+		close $fh;
+		return 1;
 	}
 
-	print FH $pid, "\n";
-	close FH;
-
-	return 1;
+	syslog( "err", "cannot create pidfile $file: $!" );
+	return;
 }
 
 
@@ -402,10 +438,12 @@ List of hostnames and keys.
     name => "host1",
     domain => "dyn.example.org",
     key => "<key1>",
+    link => 'default',
  }, {
     name => "host2",
     domain => "dyn.example.org",
     key => "<key2>",
+    link => 'tdsl',
  });
 
 TSIG key as generated with:
@@ -425,9 +463,9 @@ Pidfile name.
 Alternative path for unix socket to listen on. Make sure you use the same
 path for nspamper-change.
 
-=item B<$statusfile> = 'I<status-file>';
+=item B<$statuspath> = 'I<status-path>';
 
-File to store status information in.
+path to store status information in.
 
 =back
 
@@ -447,30 +485,4 @@ L<nspamper-change>, L<nsupdate>.
 =cut
 
 __END__
-
-TODO: use several NS
-TODO: add TXT records with timestamp for zone sync conflict resolution
-
-- get_ns()
-  - get _version._nspamper.<domain> TXT
-  - get <domain> SOA (no version)
-  - get _ns._nspamper.<domain> A? SRV? (version 1)
-
-- get_update_ns()
-  - foreach get_ns()
-    - if( ! $ns->already_done )
-      - get <hostname> A
-      - if( ! $ns->matches )
-        - push @update_ns, $ns
-
-- update_ns()
-  - update A and TXT record (with timestamp)
-
-- foreach( get_update_ns ){
-  - if( ! update_ns( $ns ) )
-    - $timeout = 10;
-
-- wait( $newip, $timeout )
-
-
 

@@ -53,8 +53,11 @@ install:
 	mv $(TMP)/usr/bin/ddns $(TMP)/usr/sbin/
 	mv $(TMP)/usr/bin/dyn2nsup $(TMP)/usr/lib/cgi-bin/
 	cp nspamper.conf $(TMP)/etc
-	cp debian/ip-up $(TMP)/etc/ppp/ip-up.d/nspamper
-	chmod +x $(TMP)/etc/ppp/ip-up.d/nspamper
+	install debian/ip-up $(TMP)/etc/ppp/ip-up.d/nspamper
+	install debian/ip-down $(TMP)/etc/ppp/ip-down.d/nspamper
+	install debian/ipv6-up $(TMP)/etc/ppp/ipv6-up.d/nspamper
+	install debian/ipv6-down $(TMP)/etc/ppp/ipv6-down.d/nspamper
+
 
 # Build architecture-independent files here.
 binary-indep: build install
