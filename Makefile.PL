@@ -7,6 +7,7 @@ WriteMakefile(
     'PREREQ_PM'		=> {
 	# update debian/control, too!
     	'Net::DNS'	=> 0,
+	'NetAddr::IP'	=> 0,
     	}, # e.g., Module::Name => 1.1
     'EXE_FILES'		=> [qw(
     	nspamper

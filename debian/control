@@ -7,7 +7,7 @@ Standards-Version: 3.5.1
 
 Package: nspamper
 Architecture: all
-Depends: libnet-dns-perl, ${perl:Depends}
+Depends: libnet-dns-perl, libnetaddr-ip-perl, ${perl:Depends}
 Description: daemon to update dynamic DNS names
  Nspamper is a bind9 nsupdate client to keep a dynamic A record up to date
  .

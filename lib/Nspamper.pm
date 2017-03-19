@@ -3,6 +3,7 @@ use strict;
 use warnings;
 use Carp;
 use Net::DNS;
+use NetAddr::IP;
 
 our $VERSION = 0.02;
 
@@ -104,29 +105,47 @@ sub domain {
 sub compare_rr {
 	my( $self, $resolver, $domain, $host, $t, $want ) = @_;
 
-	my $name = "$host.$domain";
+	my $na;
+	if( ! defined $want ){
+		# ok
 
-	my $r = $resolver->query( $name, $t )
-		or return;
+	} elsif( $t eq 'A' or $t eq 'AAAA' ){
+		$na = eval { NetAddr::IP->new($want) }
+			or return;
+	}
+
+	my $name = "$host.$domain";
 
 	my( $ok, $bad );
 
-	foreach my $rr ( $r->answer ){
-		$rr->type eq $t
-			or next;
+	if( my $r = $resolver->query( $name, $t ) ){
 
-		if( ! defined $want ){
-			++$bad;
+		foreach my $rr ( $r->answer ){
+			$rr->type eq $t
+				or next;
 
-		} elsif( $t eq 'A' or $t eq 'AAAA' ){
-			if( $rr->address eq $want ){
-				++$ok;
-			} else {
+			if( ! defined $want ){
 				++$bad;
+
+			} elsif( $t eq 'A' or $t eq 'AAAA' ){
+				my $wa = eval { NetAddr::IP->new( $rr->address ) };
+
+				if( ! $wa ){
+					++$bad;
+
+				} elsif( $na eq $wa ){
+					++$ok;
+
+				} else {
+					++$bad;
+				}
 			}
+
+			# TODO: other rrtypes
 		}
 
-		# TODO& other rrtypes 
+	} else {
+		++$bad;
 	}
 
 	return if $ok && ! $bad;
@@ -188,7 +207,7 @@ sub update {
 		}
 	}
 
-	return 1;
+	return !$error;
 }
 
 1;

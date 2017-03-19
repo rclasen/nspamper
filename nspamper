@@ -266,12 +266,16 @@ while(1){
 
 		} else {
 			syslog( "debug", "updating $ent->{host}");
+			foreach my $c ( @$changes ){
+				syslog( "debug", "set $c->{name}/$c->{type}=".($c->{want}||'undef'));
+			}
+
 			if( ! $pamper->update( $ent->{key}, $changes ) ){
 				syslog( "notice", "failed to update $name");
 				++$retry;
 			} else {
-				syslog( "debug", "updated $name");
-				++$ent->{updated};
+				syslog( "info", "updated $name, to verify");
+				++$retry;
 			}
 		}
 	}
@@ -292,7 +296,6 @@ while(1){
 
 	while(<CLIENT>){
 		chomp;
-		syslog( "debug", "got: $_");
 
 		my( $link, $rr, $data ) = split(/\s/, $_, 3);
 
@@ -306,7 +309,12 @@ while(1){
 			next;
 		}
 
-		# TODO: check data
+		syslog( "debug", "got new data for $link/$rr: ".($data||'undef'));
+
+		if( $data eq '' ){
+			$data = undef;
+		} # TODO: check data
+
 		$want{$link}{$rr} = $data;
 		&write_status_rr( $link, $rr, $data );
 
@@ -324,10 +332,10 @@ while(1){
 sub write_status_rr {
 	my( $link, $rr, $data ) = @_;
 
-	syslog( "info", "remembering new $link/$rr data");
+	syslog( "info", "remembering new $link/$rr=".($data||'undef'));
 
 	my $fn = "$statuspath/$link.$rr";
-	if( ! open( my $fh, ">", $fn) ){
+	if( open( my $fh, ">", $fn) ){
 		print $fh "$data\n";
 		close $fh;
 		return 1;
@@ -376,9 +384,12 @@ sub read_status_rr {
 	close $fh;
 
 	chomp $data;
-	# TODO: check data
+	if( $data eq '' ){
+		$data = undef;
+	} # TODO: check data
 
 	$want{$link}{$rr} = $data;
+	syslog('debug', "old $link/$rr=".($data||'undef') );
 
 	return 1;
 }

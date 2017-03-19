@@ -1,7 +1,3 @@
-^\w{3} [ :0-9]{11} [._[:alnum:]-]+ nspamper\[[0-9]+\]: old IP: [0-9.]+$
-^\w{3} [ :0-9]{11} [._[:alnum:]-]+ nspamper\[[0-9]+\]: new IP: [0-9.]+$
-^\w{3} [ :0-9]{11} [._[:alnum:]-]+ nspamper\[[0-9]+\]: waiting for IP change$
-^\w{3} [ :0-9]{11} [._[:alnum:]-]+ nspamper\[[0-9]+\]: remembering new IP$
-^\w{3} [ :0-9]{11} [._[:alnum:]-]+ nspamper\[[0-9]+\]: current [a-zA-Z0-9._-]*=[0-9.]+$
-^\w{3} [ :0-9]{11} [._[:alnum:]-]+ nspamper\[[0-9]+\]: updated [a-zA-Z0-9._-]*=[0-9.]+$
+^\w{3} [ :0-9]{11} [._[:alnum:]-]+ nspamper\[[0-9]+\]: remembering new 
+^\w{3} [ :0-9]{11} [._[:alnum:]-]+ nspamper\[[0-9]+\]: updated [a-zA-Z0-9._-]
 ^\w{3} [ :0-9]{11} [._[:alnum:]-]+ nspamper\[[0-9]+\]: failed to resolve [a-zA-Z0-9._-]*: NXDOMAIN$

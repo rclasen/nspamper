@@ -10,7 +10,7 @@ zone "dyn.example.com" {
 	update-policy {
 		// allow updates to names matching the key name
 		// TXT will get used in the future
-		grant * self * A TXT;
+		grant * self * A AAAA TXT;
 	};
 
 	allow-transfer { none; };
