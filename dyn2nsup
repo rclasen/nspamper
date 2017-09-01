@@ -109,7 +109,7 @@ sub is_ip {
 sub doupdate {
 	my( $fqdn, $ip, $key ) = @_;
 
-	my( $host, $domain ) = split /\./, 2, $fqdn;
+	my( $host, $domain ) = split /\./, $fqdn, 2;
 
 	my $changes = $pamper->compare( $domain, $host, {
 		'A' => $ip,

@@ -1,3 +1,9 @@
+nspamper (0.1.2) UNRELEASED; urgency=low
+
+  * fix dyn2nsup hostname parsing
+
+ -- Rainer Clasen <bj@zuto.de>  Fri, 01 Sep 2017 12:14:26 +0200
+
 nspamper (0.1.1) stable; urgency=low
 
   * refactored to support ipv6 and link groups
