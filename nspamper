@@ -195,6 +195,10 @@ if( $daemon ){
 	} elsif( $pid > 0 ){
 		exit 0;
 	}
+
+	open( STDIN, "</dev/null");
+	open( STDOUT, ">/dev/null");
+	open( STDERR, ">&STDOUT");
 }
 
 
