@@ -8,9 +8,11 @@
 # distribution.
 #
 
+use warnings;
 use strict;
 use Getopt::Long;
 use Data::Dumper;
+use File::Copy;
 
 my $kdir = "/etc/bind/keys";
 my $conf = "/etc/bind/ddns.conf";
@@ -81,14 +83,14 @@ if( $cmd eq "host" ){
 
 	my $key;
 	my $kf = &keyfile( $host );
-	open( K, $kf )
+	open( my $fh, '<', $kf )
 		or die "cannot open keyfile: $!";
-	while(<K>){
+	while(<$fh>){
 		if( /^Key: (.*)/ ){
 			$key = $1;
 		}
 	}
-	close(K);
+	close($fh);
 
 	if( ! $key ){
 		die "key not found in keyfile";
@@ -101,20 +103,23 @@ if( $cmd eq "host" ){
 	# nothing to do
 }
 
+umask( 0027 );
+
 # save config
-rename( $conf, "$conf.old" )
+unlink( "$conf.old");
+copy( $conf, "$conf.old" )
 	or die "failed to backup config: $!";
-open(CONF, ">$conf" )
+open(my $cfh, '>', $conf )
 	or die "cannot write config: $!";
-print CONF Dumper( $dat );
-close( CONF );
+print $cfh Dumper( $dat );
+close( $cfh );
 
 # generate named.conf
-open(NDC, ">$ndc" )
+open(my $nfh, '>', $ndc )
 	or die "cannot write named config: $!";
 foreach my $host ( keys %$dat ){
 	my $e = $dat->{$host};
-	print NDC <<EOF;
+	print $nfh <<EOF;
 key $host. {
 	algorithm hmac-md5;
 	secret "$e->{key}";
@@ -122,13 +127,13 @@ key $host. {
 
 EOF
 }
-close(NDC);
+close($nfh);
 
 sub keyfile {
 	my( $host ) = @_;
-	opendir( K, "." ) or die "cannot read key directory: $!";
-	my @f = grep { /^K$host\.\+\d+\+\d+\.private$/ } readdir(K);
-	closedir K;
+	opendir( my $k, "." ) or die "cannot read key directory: $!";
+	my @f = grep { /^K$host\.\+\d+\+\d+\.private$/ } readdir($k);
+	closedir $k;
 	return $f[0];
 }
 
