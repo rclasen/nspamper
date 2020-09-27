@@ -6,7 +6,6 @@
 
 # Uncomment this to turn on verbose mode.
 #export DH_VERBOSE=1
-export DH_COMPAT=4
 
 PACKAGE=$(shell dh_listpackages)
 
@@ -14,9 +13,6 @@ ifndef PERL
 PERL = /usr/bin/perl
 endif
 
-ifndef DESTDIR
-DESTDIR=..
-endif
 TMP     =`pwd`/debian/$(PACKAGE)
 
 build: build-stamp
@@ -47,8 +43,8 @@ install:
 	dh_installdirs
 
 	# Add here commands to install the package into debian/tmp.
-	#$(MAKE) install DESTDIR=`pwd`/debian/tmp
-	$(MAKE) install PREFIX=$(TMP)/usr
+	$(MAKE) install DESTDIR=$(TMP)
+	#$(MAKE) install PREFIX=$(TMP)/usr
 	mv $(TMP)/usr/bin/nspamper $(TMP)/usr/sbin/
 	mv $(TMP)/usr/bin/ddns $(TMP)/usr/sbin/
 	mv $(TMP)/usr/bin/dyn2nsup $(TMP)/usr/lib/cgi-bin/
@@ -88,7 +84,7 @@ binary-arch: build install
 	dh_shlibdeps
 	dh_gencontrol
 	dh_md5sums
-	dh_builddeb --destdir=$(DESTDIR)
+	dh_builddeb
 
 source diff:
 	@echo >&2 'source and diff are obsolete - use dpkg-source -b'; false
