@@ -1,11 +1,12 @@
-nspamper (0.1.5) UNRELEASED; urgency=low
+nspamper (0.1.6) UNRELEASED; urgency=low
 
   * close filedescriptors on daemonize
   * rebuild for buster
   * keep file permissions
   * send updates to each NS individually
+  * log resolver in updates
 
- -- Rainer Clasen <bj@zuto.de>  Sun, 27 Sep 2020 12:12:50 +0200
+ -- Rainer Clasen <bj@zuto.de>  Tue, 24 Nov 2020 09:54:46 +0100
 
 nspamper (0.1.2) UNRELEASED; urgency=low
 

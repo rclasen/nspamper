@@ -271,7 +271,9 @@ while(1){
 		} else {
 			syslog( "debug", "updating $ent->{host}");
 			foreach my $c ( @$changes ){
-				syslog( "debug", "set $c->{name}/$c->{type}=".($c->{want}||'undef'));
+				syslog( "debug", "set $c->{name}"
+					."/$c->{type}=".($c->{want}||'undef')
+					." @". join(',', $c->{resolver}->nameservers) );
 			}
 
 			if( ! $pamper->update( $ent->{key}, $changes ) ){
