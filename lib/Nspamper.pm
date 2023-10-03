@@ -12,7 +12,7 @@ our $VERSION = 0.02;
 sub new {
 	my( $proto ) = @_;
 
-	bless {
+	return bless {
 		resolver	=> Net::DNS::Resolver->new,
 		domain	=> {
 			# name => [ $nsresolver, ... ]
@@ -63,7 +63,7 @@ sub ns {
 
 	$ns = lc $ns;
 
-	$self->{ns}{$ns}
+	return $self->{ns}{$ns}
 		||= $self->ns_get( $ns );
 }
 
@@ -98,7 +98,7 @@ sub domain {
 
 	$domain = lc $domain;
 
-	$self->{domain}{$domain}
+	return $self->{domain}{$domain}
 		||= $self->domain_get( $domain );
 }
 
