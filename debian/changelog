@@ -3,6 +3,7 @@ nspamper (0.1.5) UNRELEASED; urgency=low
   * close filedescriptors on daemonize
   * rebuild for buster
   * keep file permissions
+  * send updates to each NS individually
 
  -- Rainer Clasen <bj@zuto.de>  Sun, 27 Sep 2020 12:12:50 +0200
 

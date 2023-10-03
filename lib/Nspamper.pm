@@ -72,20 +72,18 @@ sub domain_get {
 
 	my @resolver;
 
-	if( my $r = $self->{resolver}->query( $domain, 'SOA' ) ){
+	if( my $r = $self->{resolver}->query( $domain, 'NS' ) ){
 		foreach my $rr ( $r->answer ){
-			$rr->type eq 'SOA'
+			$rr->type eq 'NS'
 				or next;
 
-			my $ns = $self->ns( $rr->mname )
+			my $ns = $self->ns( $rr->nsdname )
 				or next;
 
 			push @resolver, $ns;
 		}
 		# TODO: only lookup A/AAAA if they're not in $rr->additional
 	}
-
-	# TODO: secondary NS... if they don't get xfer from primary
 
 	# report failure if no resolver was found
 	@resolver or return;
