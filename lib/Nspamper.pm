@@ -182,17 +182,24 @@ sub compare {
 }
 
 sub update {
-	my( $self, $key, $changes ) = @_;
+	my( $self, $key, $algorithm, $changes ) = @_;
 
 	ref $changes eq 'ARRAY'
 		or croak "bad changes argument";
 
+	$algorithm ||= 'HMAC-MD5';
 	my $error;
 
 	foreach my $c ( @$changes ){
 		my $resolver = $c->{resolver};
 
-		$c->{update}->sign_tsig( $c->{name}, $key );
+		my $tsig = Net::DNS::RR->new(
+			name      => $c->{name},
+			type      => 'TSIG',
+			algorithm => $algorithm,
+			key       => $key,
+		);
+		$c->{update}->push( 'additional' => $tsig );
 		if( my $r = $resolver->send( $c->{update} ) ){
 			if( $r->header->rcode ne 'NOERROR' ){
 				$c->{error} = $r->header->rcode;

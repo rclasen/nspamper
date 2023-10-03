@@ -276,7 +276,7 @@ while(1){
 					." @". join(',', $c->{resolver}->nameservers) );
 			}
 
-			if( ! $pamper->update( $ent->{key}, $changes ) ){
+			if( ! $pamper->update( $ent->{key}, $ent->{algorithm}, $changes ) ){
 				syslog( "notice", "failed to update $name");
 				++$retry;
 			} else {
