@@ -89,7 +89,7 @@ foreach my $hostname ( @hostnames ){
 	if( $dat->{user} ne $ENV{REMOTE_USER} ){
 		&fail( "!yours" );
 	}
-	&doupdate( $hostname, $myip, $dat->{key} );
+	&doupdate( $hostname, $myip, $dat->{key}, $dat->{algorithm} );
 }
 print "good\n";
 exit 0;
@@ -109,7 +109,7 @@ sub is_ip {
 }
 
 sub doupdate {
-	my( $fqdn, $ip, $key ) = @_;
+	my( $fqdn, $ip, $key, $algorithm ) = @_;
 
 	my( $host, $domain ) = split /\./, $fqdn, 2;
 
@@ -119,7 +119,7 @@ sub doupdate {
 
 	@$changes or &fail( "nochg" );
 
-	$pamper->update( $key, $changes )
+	$pamper->update( $key, $algorithm, $changes )
 		or &fail( "dnserr" );
 
 	return 1;
