@@ -10,6 +10,8 @@
 #
 
 use strict;
+use warnings;
+use strict;
 use CGI qw/:standard/;
 use Nspamper;
 use Sys::Syslog;
@@ -119,6 +121,8 @@ sub doupdate {
 
 	$pamper->update( $key, $changes )
 		or &fail( "dnserr" );
+
+	return 1;
 }
 
 sub fail {
